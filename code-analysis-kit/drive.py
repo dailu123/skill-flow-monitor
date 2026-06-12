@@ -46,6 +46,12 @@ def progress_path(repo):
     return os.path.join(KIT, "work", repo, "PROGRESS.md")
 
 
+def repo_source_root(repo):
+    """PROGRESS.md 顶部的 ROOT: 行 = 被分析源码的路径（多半在工作目录之外）。"""
+    m = re.search(r"^ROOT:\s*(.+)$", open(progress_path(repo), encoding="utf-8").read(), re.M)
+    return m.group(1).strip() if m else None
+
+
 def count_status(repo):
     txt = open(progress_path(repo), encoding="utf-8").read()
     return {st: len(re.findall(rf"\|\s*{st}\s*\|", txt))
@@ -81,6 +87,8 @@ def main():
     ap.add_argument("--model", default="")
     ap.add_argument("--timeout", type=int, default=2400)
     ap.add_argument("--max-runs", type=int, default=999)
+    ap.add_argument("--add-dir", action="append", default=[],
+                    help="额外加入 CLI 信任区的目录（可多次）；被分析源码的 ROOT 会自动加入")
     args = ap.parse_args()
 
     if not os.path.exists(progress_path(args.repo)):
@@ -107,12 +115,16 @@ def main():
         last_todo = c["TODO"]
 
         cmd = args.cli.split() + ["-p", make_prompt(args.repo, args.batch), "--allow-all-tools"]
+        src_root = repo_source_root(args.repo)
+        for d in dict.fromkeys(([src_root] if src_root and os.path.isdir(src_root) else []) + args.add_dir):
+            cmd += ["--add-dir", d]  # 源码在工作目录之外，必须进信任区，否则 CLI 会卡在目录授权上
         if args.model:
             cmd += ["--model", args.model]
         log(args.repo, f"第 {run} 轮：剩 TODO {c['TODO']} / DONE {c['DONE']}，"
                        f"派发 {args.batch} 个单元...")
         try:
             r = subprocess.run(cmd, cwd=repo_root, timeout=args.timeout,
+                               stdin=subprocess.DEVNULL,  # 没有人值守：等输入=立即失败，别干耗
                                capture_output=True, text=True, encoding="utf-8", errors="ignore")
             tail = (r.stdout or "").strip().splitlines()[-3:]
             log(args.repo, f"第 {run} 轮结束（exit={r.returncode}）" +
