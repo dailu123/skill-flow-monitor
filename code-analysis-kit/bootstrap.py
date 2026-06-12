@@ -84,6 +84,7 @@ RPG_EXT = {"rpg", "rpgle", "sqlrpgle", "rpg38", "rpglemod", "clp", "clle", "cl",
 DDS_EXT = {"dds", "pf", "lf", "dspf", "prtf"}
 
 RE_JAVA_TYPE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
+RE_JAVA_IMPORT = re.compile(r"^import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
 RE_JAVA_EP = re.compile(r'@(?:RequestMapping|GetMapping|PostMapping|PutMapping|'
                         r'DeleteMapping|PatchMapping)\s*\(\s*(?:value\s*=\s*)?"([^"]*)"')
 RE_JAVA_TBL = re.compile(r'@Table\s*\(\s*name\s*=\s*"([^"]+)"')
@@ -106,6 +107,7 @@ def scan_file(path, ext, stem):
     syms = []
     if ext in JAVA_EXT:
         syms += [("type", n) for n in RE_JAVA_TYPE.findall(text)]
+        syms += [("import", n) for n in RE_JAVA_IMPORT.findall(text)]
         syms += [("endpoint", n or "/") for n in RE_JAVA_EP.findall(text)]
         syms += [("table", n) for n in RE_JAVA_TBL.findall(text)]
         if RE_JAVA_ENTITY.search(text) and not RE_JAVA_TBL.search(text):

@@ -37,6 +37,9 @@
     第4步  写笔记 notes/R/<U的ID>-<目录名>.md（模板：notes/_TEMPLATE.md）。
     第5步  把本单元发现的“对外接口/程序/表/界面”逐行追加到 evidence/R/inventory.csv，
            发现的业务功能线索追加到 evidence/R/business-functions.md（带证据 文件:行号）。
+           发现的跨模块依赖（import/CALL 之外的：共享表、MQ、文件接口、定时器触发等）
+           追加到 evidence/R/relations.csv（格式 from,to,kind,evidence；from/to 用
+           PROGRESS 里的目录），可视化会自动把这些连线画到代码地图上。
     第6步  更新 PROGRESS：U 改 DONE，填笔记路径和一句话摘要。
     第7步  刷新可视化（能跑命令时执行；失败不阻塞）：
            python code-analysis-kit/render_status.py --out-dir public/status --view overview

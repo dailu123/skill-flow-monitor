@@ -10,6 +10,7 @@
 | `hub/inventory.csv` | 阶段A 每单元追加 | HUB 的程序/PF/LF/DSPF/CL 清单 | 同上 |
 | `mca/business-functions.md` | 阶段A | 从代码推断的业务功能 + 证据 | 抽查证据行号 |
 | `hub/business-functions.md` | 阶段A | 同上 | 同上 |
+| `mca/relations.csv` `hub/relations.csv` | 阶段A | AI 验证的跨模块依赖（共享表/MQ/文件接口），会画到代码地图上 | 抽查 evidence 列的 文件:行号 |
 | `capabilities.csv` | 阶段C | 业务能力对齐矩阵（对比报告的唯一数据源） | 见下 |
 
 ## capabilities.csv 印证方法

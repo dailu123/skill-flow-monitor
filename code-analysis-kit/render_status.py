@@ -139,6 +139,69 @@ def build_overview():
             "skills": nodes, "edges": edges, "updatedAt": now()}
 
 
+# ---------- 依赖连线：SYMBOLS 的 import/CALL 图 + AI 验证的 relations.csv ----------
+def dir_of(rel):
+    return rel.rsplit("/", 1)[0] if "/" in rel else "."
+
+
+def load_symbols(name):
+    path = os.path.join(KIT, "work", name, "SYMBOLS.txt")
+    out = []
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) == 3:
+                    out.append(parts)
+    return out
+
+
+def dep_edges(name, dirset):
+    """返回 {(from_dir, to_dir)}，两端都收敛到任务队列里存在的目录。"""
+    syms = load_symbols(name)
+    defs = {}  # 类名/程序名 -> 定义它的目录集合
+    for f, k, sym in syms:
+        if k == "type":
+            defs.setdefault(sym, set()).add(dir_of(f))
+        elif k == "program":
+            defs.setdefault(sym.upper(), set()).add(dir_of(f))
+
+    raw = set()
+    for f, k, sym in syms:
+        a = dir_of(f)
+        if k == "import":  # Java：import 的类在哪个目录定义，且包路径后缀要对得上（防同名误连）
+            cls = sym.rsplit(".", 1)[-1]
+            pkg = sym.rsplit(".", 1)[0].replace(".", "/") if "." in sym else ""
+            for b in defs.get(cls, ()):
+                if not pkg or b.endswith(pkg):
+                    raw.add((a, b))
+        elif k == "call":  # RPG/CL：CALL 的程序在哪个目录定义
+            for b in defs.get(sym.upper(), ()):
+                raw.add((a, b))
+
+    # AI 分析时验证/发现的关系（共享表、MQ、文件接口等正则看不出来的）
+    rp = os.path.join(KIT, "evidence", name, "relations.csv")
+    if os.path.exists(rp):
+        with open(rp, encoding="utf-8-sig", newline="") as fh:
+            for r in csv.DictReader(fh):
+                a = (r.get("from") or "").strip().lstrip("./")
+                b = (r.get("to") or "").strip().lstrip("./")
+                if a and b:
+                    raw.add((a, b))
+
+    def climb(d):  # 收敛到队列中存在的目录（小目录可能已被归并）
+        while d and d not in dirset:
+            d = d.rsplit("/", 1)[0] if "/" in d else None
+        return d
+
+    out = set()
+    for a, b in raw:
+        ca, cb = climb(a), climb(b)
+        if ca and cb and ca != cb:
+            out.add((ca, cb))
+    return out
+
+
 # ---------- 单仓库目录视图 ----------
 def build_repo_view(name):
     units = parse_progress(name)
@@ -168,8 +231,12 @@ def build_repo_view(name):
         nodes.append({"id": nid("d", d), "name": d.split("/")[-1] if d != "." else "(root)",
                       "type": chip, "status": st, "progress": pct, "detail": detail})
 
-    edges = []
-    for d in by_dir:
+    deps = dep_edges(name, dirset)
+    edges = [{"from": nid("d", a), "to": nid("d", b)} for a, b in sorted(deps)]
+    linked = {a for a, _ in deps} | {b for _, b in deps}
+    for d in by_dir:  # 没有任何依赖线的节点，用目录树边兜底，避免悬空
+        if d in linked:
+            continue
         parts = d.split("/")
         for i in range(len(parts) - 1, 0, -1):
             anc = "/".join(parts[:i])
