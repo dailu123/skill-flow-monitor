@@ -278,13 +278,16 @@ def build_lineage(mode="gaps"):
         rows = [r for r in rows if (r.get("parity") or "").strip().lower() != "both"]
     if not rows:
         return None
+    overflow = max(0, len(rows) - 60)
+    rows = rows[:60]  # 图只能承载这么多；全量看 matrix.html
     nodes, edges, seen = [], [], set()
     known_dirs = {u["dir"] for u in parse_progress("mca")} | {u["dir"] for u in parse_progress("hub")}
 
     cmp_done = report_exists("COMPARE.md")
     nodes.append({"id": "REPORT", "label": "对比报告", "type": "table",
                   "status": "done" if cmp_done else "pending",
-                  "progress": 100 if cmp_done else 0, "detail": "reports/COMPARE.md"})
+                  "progress": 100 if cmp_done else 0,
+                  "detail": f"另有 {overflow} 项见 matrix.html" if overflow else "reports/COMPARE.md"})
 
     for r in rows:
         cap = r["capability"].strip()
@@ -322,42 +325,76 @@ PARITY_CN = {"both": ("两边都有", "#1e8e3e"), "mca-only": ("仅 MCA", "#d930
 
 
 def build_matrix_html():
-    """能力对齐矩阵：映射关系的主视图（图只留给缺口）。"""
+    """能力/映射对齐矩阵：数据嵌 JSON，DOM 只渲染过滤后前 400 行 → 上万行不卡。"""
     rows = cap_rows()
+    cols = ("domain", "capability", "parity", "mca_modules", "mca_evidence",
+            "hub_modules", "hub_evidence", "note")
+    data = [{k: (r.get(k) or "").strip() for k in cols} for r in rows]
+    data.sort(key=lambda r: (r["domain"], r["capability"]))
     cnt = {}
-    for r in rows:
-        p = (r.get("parity") or "uncertain").strip().lower()
-        cnt[p] = cnt.get(p, 0) + 1
-    body = []
-    for r in sorted(rows, key=lambda x: ((x.get("domain") or ""), x.get("capability") or "")):
-        p = (r.get("parity") or "uncertain").strip().lower()
-        label, color = PARITY_CN.get(p, (p, "#9aa0a6"))
-        def esc(k):
-            return (r.get(k) or "").replace("&", "&amp;").replace("<", "&lt;")
-        body.append(
-            f'<tr class="{p}"><td>{esc("domain")}</td><td><b>{esc("capability")}</b></td>'
-            f'<td><span class="badge" style="background:{color}">{label}</span></td>'
-            f'<td>{esc("mca_modules")}<div class="ev">{esc("mca_evidence")}</div></td>'
-            f'<td>{esc("hub_modules")}<div class="ev">{esc("hub_evidence")}</div></td>'
-            f'<td>{esc("note")}</td></tr>')
+    for r in data:
+        cnt[r["parity"].lower() or "uncertain"] = cnt.get(r["parity"].lower() or "uncertain", 0) + 1
     summary = " · ".join(f"{PARITY_CN.get(k, (k,))[0]} {v}" for k, v in sorted(cnt.items()))
-    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+    domains = sorted({r["domain"] for r in data if r["domain"]})
+    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    dom_opts = "".join(f'<option>{d}</option>' for d in domains)
+    return """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <title>业务能力对齐矩阵</title><style>
-body{{font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:24px;color:#202124}}
-h1{{font-size:18px}} .sub{{color:#5f6368;margin-bottom:12px}}
-input{{padding:6px 10px;width:280px;margin-bottom:12px;border:1px solid #dadce0;border-radius:6px}}
-table{{border-collapse:collapse;width:100%}} th,td{{border:1px solid #e0e0e0;padding:6px 10px;
-text-align:left;vertical-align:top}} th{{background:#f1f3f4;position:sticky;top:0}}
-tr.mca-only td,tr.hub-only td{{background:#fce8e6}} tr.both td{{background:#e6f4ea}}
-.badge{{color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;white-space:nowrap}}
-.ev{{color:#5f6368;font-size:12px}}</style></head><body>
+body{font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:24px;color:#202124}
+h1{font-size:18px} .sub{color:#5f6368;margin-bottom:12px}
+.bar{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+input,select{padding:6px 10px;border:1px solid #dadce0;border-radius:6px}
+input{width:260px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #e0e0e0;padding:5px 9px;text-align:left;vertical-align:top}
+th{background:#f1f3f4;position:sticky;top:0}
+tr.mca-only td,tr.hub-only td{background:#fce8e6} tr.both td{background:#e6f4ea}
+.badge{color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;white-space:nowrap}
+.ev{color:#5f6368;font-size:12px} #more{color:#5f6368;padding:10px}
+</style></head><body>
 <h1>业务能力对齐矩阵（MCA ↔ HUB）</h1>
-<div class="sub">{summary}　|　生成于 {now()}　|　数据源 evidence/capabilities.csv（改完 F5 刷新）</div>
-<input placeholder="过滤：能力 / 域 / 模块名..." oninput="
-var q=this.value.toLowerCase();document.querySelectorAll('tbody tr').forEach(function(t){{
-t.style.display=t.textContent.toLowerCase().indexOf(q)>=0?'':'none'}})">
+<div class="sub">__SUMMARY__　|　生成于 __NOW__　|　数据源 evidence/capabilities.csv（F5 刷新）</div>
+<div class="bar">
+<input id="q" placeholder="搜索：能力 / 模块 / 证据...">
+<select id="dom"><option value="">全部业务域</option>__DOMS__</select>
+<select id="par"><option value="">全部状态</option><option>both</option><option>mca-only</option>
+<option>hub-only</option><option>uncertain</option></select>
+<span id="n"></span></div>
 <table><thead><tr><th>业务域</th><th>能力</th><th>对齐</th><th>MCA(Java)</th><th>HUB(AS400)</th>
-<th>备注</th></tr></thead><tbody>{''.join(body)}</tbody></table></body></html>"""
+<th>备注</th></tr></thead><tbody id="tb"></tbody></table><div id="more"></div>
+<script>
+var DATA=__DATA__,CAP=400,t=null;
+var COLOR={both:'#1e8e3e','mca-only':'#d93025','hub-only':'#d93025',uncertain:'#9aa0a6'};
+var LABEL={both:'两边都有','mca-only':'仅 MCA','hub-only':'仅 HUB',uncertain:'未确认'};
+function esc(x){return x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function render(){
+  var q=document.getElementById('q').value.toLowerCase(),
+      d=document.getElementById('dom').value,p=document.getElementById('par').value;
+  var hit=DATA.filter(function(r){
+    if(d&&r.domain!==d)return false;
+    var pr=(r.parity||'uncertain').toLowerCase();
+    if(p&&pr!==p)return false;
+    if(q&&JSON.stringify(r).toLowerCase().indexOf(q)<0)return false;
+    return true});
+  var rows=hit.slice(0,CAP).map(function(r){
+    var pr=(r.parity||'uncertain').toLowerCase();
+    return '<tr class="'+pr+'"><td>'+esc(r.domain)+'</td><td><b>'+esc(r.capability)+
+      '</b></td><td><span class="badge" style="background:'+(COLOR[pr]||'#9aa0a6')+'">'+
+      (LABEL[pr]||pr)+'</span></td><td>'+esc(r.mca_modules)+'<div class="ev">'+
+      esc(r.mca_evidence)+'</div></td><td>'+esc(r.hub_modules)+'<div class="ev">'+
+      esc(r.hub_evidence)+'</div></td><td>'+esc(r.note)+'</td></tr>'});
+  document.getElementById('tb').innerHTML=rows.join('');
+  document.getElementById('n').textContent='匹配 '+hit.length+' / '+DATA.length+' 条';
+  document.getElementById('more').textContent=
+    hit.length>CAP?'只显示前 '+CAP+' 条，请继续收窄过滤条件':'';
+}
+function deb(){clearTimeout(t);t=setTimeout(render,150)}
+document.getElementById('q').addEventListener('input',deb);
+document.getElementById('dom').addEventListener('change',render);
+document.getElementById('par').addEventListener('change',render);
+render();
+</script></body></html>""".replace("__SUMMARY__", summary).replace("__NOW__", now()) \
+        .replace("__DOMS__", dom_opts).replace("__DATA__", payload)
 
 
 def write_json(path, payload):
