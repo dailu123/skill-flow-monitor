@@ -90,14 +90,16 @@ def repo_phase(name, cn):
     """一个仓库分支的三个阶段节点。"""
     units = parse_progress(name)
     total = len(units)
+    skipped = sum(1 for u in units if u["status"] == "skipped")
+    eff = total - skipped  # SKIP（预分类跳过的沉淀物）不计入分析任务
     done = sum(1 for u in units if u["status"] == "done")
     running = sum(1 for u in units if u["status"] == "running")
 
     map_st = "done" if total else "pending"
-    if done == total and total:
+    if eff and done >= eff:
         ana_st, ana_pct = "done", 100
     elif running or done:
-        ana_st, ana_pct = "running", round(100 * done / total) if total else 0
+        ana_st, ana_pct = "running", round(100 * done / eff) if eff else 0
     else:
         ana_st, ana_pct = "pending", 0
     arch_fn = f"ARCH-{name}.md"
@@ -107,7 +109,7 @@ def repo_phase(name, cn):
         phase_node(f"{name}-map", f"{cn} 地图扫描", map_st, PCT[map_st],
                    f"{total} 个分析单元" if total else "待 bootstrap"),
         phase_node(f"{name}-analyze", f"{cn} 模块分析", ana_st, ana_pct,
-                   f"{done}/{total} 单元完成"),
+                   f"{done}/{eff} 单元完成" + (f"（另 {skipped} 个已跳过）" if skipped else "")),
         phase_node(f"{name}-arch", f"{cn} 架构汇总", arch_st, PCT[arch_st],
                    f"reports/{arch_fn}"),
     ], [
@@ -148,7 +150,9 @@ def build_repo_view(name):
     nodes, dirset = [], set(by_dir)
     for d, us in sorted(by_dir.items()):
         sts = [u["status"] for u in us]
-        if all(s == "done" for s in sts):
+        if all(s == "skipped" for s in sts):
+            st = "skipped"
+        elif all(s in ("done", "skipped") for s in sts):
             st = "done"
         elif "error" in sts:
             st = "error"
@@ -156,7 +160,8 @@ def build_repo_view(name):
             st = "running"
         else:
             st = "pending"
-        pct = round(sum(PCT[s] for s in sts) / len(sts))
+        eff = [s for s in sts if s != "skipped"] or sts
+        pct = round(sum(PCT[s] for s in eff) / len(eff))
         summary = next((u["summary"] for u in us if u["summary"]), "")
         n_files = sum(u["count"] for u in us)
         detail = summary or (f"{n_files} 文件 · {len(us)} 块" if len(us) > 1 else f"{n_files} 个源码文件")

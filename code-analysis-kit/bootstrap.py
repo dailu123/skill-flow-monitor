@@ -15,10 +15,20 @@
   --exts      逗号分隔扩展名，覆盖 preset
   --min       目录至少多少源码文件才进队列（默认 3）
   --chunk     单目录超过多少文件就拆块（默认 50；AS/400 一库几千 member 必须拆）
+  --top       MAP.md 里目录排行显示多少行（默认 80）
+  --include-tests  测试目录也纳入分析（默认 SKIP）
+  --no-sniff       关闭 sql/xml 内容嗅探（嗅探只读每文件头部16KB，通常没必要关）
+
+预分类：队列生成时自动把"历史沉淀物"标出来，模型不浪费轮次：
+  - 测试/夹具/生成物目录 → 状态 SKIP（留痕可审计，要分析就手动改回 TODO）
+  - 迁移脚本链(flyway/liquibase/migrations) → 合并成 1 个单元，指令=只提取最终表清单
+  - 纯 INSERT 种子数据 SQL → SKIP；含存储过程 SQL → 标记必须精读
+  - MyBatis mapper XML → 标记重点提取表与SQL
 """
 import argparse
 import math
 import os
+import re
 from collections import Counter
 from datetime import date
 
@@ -100,8 +110,60 @@ def write_map(ws, name, root, src, entries, min_files, top):
         f.write("\n".join(f"{n}\t{d}" for d, n in by_dir.most_common()) + "\n")
 
 
-def write_progress(ws, name, root, src, min_files, chunk):
-    """生成任务队列。超大目录拆块：文件清单写到 chunks/Uxxx.txt。"""
+# ---------- 预分类：把历史沉淀物在排队阶段就标出来 ----------
+TEST_PAT = re.compile(r"(^|/)(src/test|tests?|__tests__|testdata|fixtures?|mocks?|mockdata|samples?)(/|$)", re.I)
+GEN_PAT = re.compile(r"(^|/)(generated|gen|\.?codegen|autogen)(/|$)", re.I)
+MIG_PAT = re.compile(r"(^|/)(db/)?(migrations?|flyway|liquibase|changelogs?)(/|$)", re.I)
+
+
+def sniff_head(path, n=16384):
+    """只读文件头部，避免拖慢扫描。"""
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            return f.read(n).upper()
+    except OSError:
+        return ""
+
+
+def classify_unit(root, d, fs, include_tests, do_sniff):
+    """返回 (status, merge, note)。
+    status: TODO|SKIP；merge=True 表示整目录合并为 1 个单元不拆块；note 进“一句话摘要”列。"""
+    if GEN_PAT.search(d):
+        return "SKIP", False, "生成代码，自动跳过；要分析改回 TODO"
+    if not include_tests and TEST_PAT.search(d):
+        return "SKIP", False, "测试/夹具，自动跳过；要分析改回 TODO"
+    if MIG_PAT.search(d):
+        return "TODO", True, "【指令】历史迁移脚本链：不逐文件分析，叠加出最终表清单写入 inventory.csv 即可"
+
+    exts = Counter(f.rsplit(".", 1)[-1].lower() for f in fs)
+    if do_sniff and exts.get("sql", 0) >= 0.8 * len(fs):
+        has_proc = has_ddl = has_data = False
+        for rel in fs[:50]:  # 抽样嗅探，控制速度
+            head = sniff_head(os.path.join(root, rel))
+            if re.search(r"CREATE\s+(OR\s+REPLACE\s+)?(PROCEDURE|FUNCTION|TRIGGER|PACKAGE)", head):
+                has_proc = True
+            if re.search(r"(CREATE|ALTER)\s+TABLE|CREATE\s+(MATERIALIZED\s+)?VIEW", head):
+                has_ddl = True
+            if "INSERT INTO" in head:
+                has_data = True
+        if has_proc:
+            return "TODO", False, "【指令】含存储过程/函数：必须精读，业务规则藏在这里"
+        if has_ddl:
+            return "TODO", True, "【指令】DDL为主：提取表清单写入 inventory.csv 即可，不逐文件分析"
+        if has_data:
+            return "SKIP", False, "纯INSERT种子数据，自动跳过；要分析改回 TODO"
+
+    if do_sniff and exts.get("xml", 0) >= 0.8 * len(fs):
+        for rel in fs[:20]:
+            if "<MAPPER" in sniff_head(os.path.join(root, rel), 4096):
+                return "TODO", False, "【指令】MyBatis mapper：重点提取表名与SQL业务查询"
+        return "TODO", True, "【指令】配置XML：快速过一遍提取数据源/作业配置即可，不逐文件分析"
+
+    return "TODO", False, ""
+
+
+def write_progress(ws, name, root, src, min_files, chunk, include_tests, do_sniff):
+    """生成任务队列。预分类标注 + 超大目录拆块（文件清单写到 chunks/Uxxx.txt）。"""
     by_dir = {}
     for f in src:
         by_dir.setdefault(dir_of(f), []).append(f)
@@ -110,20 +172,28 @@ def write_progress(ws, name, root, src, min_files, chunk):
 
     chunks_dir = os.path.join(ws, "chunks")
     rows, uid = [], 0
+    stats = Counter()
+
+    def add_chunk(part):
+        lst = f"chunks/U{uid:03d}.txt"
+        os.makedirs(chunks_dir, exist_ok=True)
+        with open(os.path.join(ws, lst.replace("/", os.sep)), "w", encoding="utf-8") as cf:
+            cf.write("\n".join(part) + "\n")
+        return lst
+
     for d, fs in dirs:
-        if len(fs) <= chunk:
+        status, merge, note = classify_unit(os.path.abspath(root), d, fs, include_tests, do_sniff)
+        stats["跳过" if status == "SKIP" else ("合并" if merge else ("指令" if note else "常规"))] += 1
+        if status == "SKIP" or merge or len(fs) <= chunk:
             uid += 1
-            rows.append((f"U{uid:03d}", d, len(fs), ""))
-        else:  # 拆块
+            lst = add_chunk(fs) if (merge and len(fs) > chunk) else ""
+            rows.append((f"U{uid:03d}", d, len(fs), status, lst, note))
+        else:  # 常规大目录拆块
             n_parts = math.ceil(len(fs) / chunk)
-            os.makedirs(chunks_dir, exist_ok=True)
             for k in range(n_parts):
                 uid += 1
                 part = fs[k * chunk:(k + 1) * chunk]
-                lst = f"chunks/U{uid:03d}.txt"
-                with open(os.path.join(ws, lst.replace("/", os.sep)), "w", encoding="utf-8") as cf:
-                    cf.write("\n".join(part) + "\n")
-                rows.append((f"U{uid:03d}", f"{d} [块{k + 1}/{n_parts}]", len(part), lst))
+                rows.append((f"U{uid:03d}", f"{d} [块{k + 1}/{n_parts}]", len(part), status, add_chunk(part), note))
 
     lines = [
         f"# 分析进度与任务队列（PROGRESS）— {name}\n",
@@ -131,17 +201,19 @@ def write_progress(ws, name, root, src, min_files, chunk):
         f"ROOT: {os.path.abspath(root)}",
         "STATUS: IN_PROGRESS\n",
         "> 模型每轮：取第一个 TODO → 处理 → 改 DONE → 下一个。规则见 copilot-instructions.md。",
-        "> 状态值：TODO / IN_PROGRESS / DONE / ERROR。",
-        "> “文件清单”列若有 chunks/Uxxx.txt，本单元只分析清单里那些文件。\n",
+        "> 状态值：TODO / IN_PROGRESS / DONE / ERROR / SKIP。",
+        "> “文件清单”列若有 chunks/Uxxx.txt，本单元只分析清单里那些文件。",
+        "> “一句话摘要”列以【指令】开头的，按指令执行后再覆盖为实际摘要。",
+        "> SKIP 行是预分类自动跳过的（测试/生成物/种子数据），人工复核后想分析就改回 TODO。\n",
         "## 队列\n",
         "| ID | 单元(目录) | 文件数 | 状态 | 文件清单 | 笔记 | 一句话摘要 |",
         "|----|-----------|--------|------|----------|------|-----------|",
     ]
-    for rid, d, n, lst in rows:
-        lines.append(f"| {rid} | {d} | {n} | TODO | {lst} |  |  |")
+    for rid, d, n, status, lst, note in rows:
+        lines.append(f"| {rid} | {d} | {n} | {status} | {lst} |  | {note} |")
     with open(os.path.join(ws, "PROGRESS.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    return len(rows)
+    return len(rows), stats
 
 
 def main():
@@ -153,6 +225,8 @@ def main():
     ap.add_argument("--min", type=int, default=3)
     ap.add_argument("--chunk", type=int, default=50)
     ap.add_argument("--top", type=int, default=80, help="MAP.md 里目录排行显示多少行")
+    ap.add_argument("--include-tests", action="store_true", help="测试目录也纳入分析")
+    ap.add_argument("--no-sniff", action="store_true", help="关闭 sql/xml 内容嗅探")
     args = ap.parse_args()
 
     exts_str = args.exts or PRESETS[args.preset]
@@ -167,9 +241,11 @@ def main():
     print(f"扫描 {args.root} （preset={args.preset}）...")
     src, entries = collect(args.root, exts)
     write_map(ws, args.name, args.root, src, entries, args.min, args.top)
-    n_units = write_progress(ws, args.name, args.root, src, args.min, args.chunk)
+    n_units, stats = write_progress(ws, args.name, args.root, src, args.min, args.chunk,
+                                    args.include_tests, not args.no_sniff)
 
     print(f"完成：{len(src)} 个源码文件 → {n_units} 个分析单元")
+    print(f"预分类：{dict(stats)}（SKIP 行请在 PROGRESS.md 里人工复核）")
     print(f"  - {os.path.join(ws, 'MAP.md')}")
     print(f"  - {os.path.join(ws, 'PROGRESS.md')}")
     if len(src) == 0:
