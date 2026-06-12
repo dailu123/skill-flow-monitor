@@ -1,0 +1,147 @@
+{
+  "title": "Sales Profit Data Mart — live AS/400 migration",
+  "skills": [
+    {
+      "id": "scan",
+      "name": "Scan AS/400 library",
+      "status": "done",
+      "progress": 100,
+      "detail": "118 members catalogued",
+      "startedAt": "2026-06-12 10:55:45",
+      "endedAt": "2026-06-12 10:55:48"
+    },
+    {
+      "id": "parse-dds",
+      "name": "Parse DDS / fields",
+      "status": "done",
+      "progress": 100,
+      "detail": "Field metadata ready",
+      "startedAt": "2026-06-12 10:55:48",
+      "endedAt": "2026-06-12 10:55:49"
+    },
+    {
+      "id": "trace",
+      "name": "Lineage traceback",
+      "status": "done",
+      "progress": 100,
+      "detail": "22-node lineage resolved",
+      "startedAt": "2026-06-12 10:55:49",
+      "endedAt": "2026-06-12 10:56:53"
+    },
+    {
+      "id": "conv-source",
+      "name": "RPG/DDS → DDL",
+      "status": "done",
+      "progress": 100,
+      "detail": "9 source objects → DDL",
+      "startedAt": "2026-06-12 10:55:57",
+      "endedAt": "2026-06-12 10:56:49"
+    },
+    {
+      "id": "conv-stg",
+      "name": "Staging → SQL",
+      "status": "done",
+      "progress": 100,
+      "detail": "6 staging tables ready",
+      "startedAt": "2026-06-12 10:56:01",
+      "endedAt": "2026-06-12 10:56:57"
+    },
+    {
+      "id": "conv-dim",
+      "name": "Dimensions → SQL",
+      "status": "done",
+      "progress": 100,
+      "detail": "3 dimensions ready",
+      "startedAt": "2026-06-12 10:56:11",
+      "endedAt": "2026-06-12 10:56:59"
+    },
+    {
+      "id": "conv-fact",
+      "name": "Facts → SQL",
+      "status": "done",
+      "progress": 100,
+      "detail": "3 fact tables ready",
+      "startedAt": "2026-06-12 10:56:28",
+      "endedAt": "2026-06-12 10:56:59"
+    },
+    {
+      "id": "conv-cl",
+      "name": "CL jobs → Python",
+      "status": "done",
+      "progress": 100,
+      "detail": "Scheduling scripts ready",
+      "startedAt": "2026-06-12 10:56:53",
+      "endedAt": "2026-06-12 10:56:57"
+    },
+    {
+      "id": "conv-mart",
+      "name": "Mart → SQL",
+      "status": "done",
+      "progress": 100,
+      "detail": "Mart table ready",
+      "startedAt": "2026-06-12 10:56:59",
+      "endedAt": "2026-06-12 10:57:01"
+    },
+    {
+      "id": "validate",
+      "name": "Full-chain validation",
+      "status": "done",
+      "progress": 100,
+      "detail": "All layers reconciled",
+      "startedAt": "2026-06-12 10:57:01",
+      "endedAt": "2026-06-12 10:57:04"
+    },
+    {
+      "id": "report",
+      "name": "Migration report",
+      "status": "done",
+      "progress": 100,
+      "detail": "Wrote mart_migration_report.md",
+      "startedAt": "2026-06-12 10:57:05",
+      "endedAt": "2026-06-12 10:57:06"
+    }
+  ],
+  "edges": [
+    {
+      "from": "scan",
+      "to": "parse-dds"
+    },
+    {
+      "from": "parse-dds",
+      "to": "trace"
+    },
+    {
+      "from": "trace",
+      "to": "conv-source"
+    },
+    {
+      "from": "conv-source",
+      "to": "conv-stg"
+    },
+    {
+      "from": "conv-stg",
+      "to": "conv-dim"
+    },
+    {
+      "from": "conv-dim",
+      "to": "conv-fact"
+    },
+    {
+      "from": "trace",
+      "to": "conv-cl"
+    },
+    {
+      "from": "conv-fact",
+      "to": "conv-mart"
+    },
+    {
+      "from": "conv-mart",
+      "to": "validate"
+    },
+    {
+      "from": "validate",
+      "to": "report"
+    }
+  ],
+  "updatedAt": "2026-06-12 10:57:06"
+}

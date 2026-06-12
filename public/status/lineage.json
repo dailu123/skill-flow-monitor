@@ -1,0 +1,348 @@
+{
+  "target": "DM_SALES_PROFIT_MART",
+  "nodes": [
+    {
+      "id": "DM_SALES_PROFIT_MART",
+      "label": "DM_SALES_PROFIT_MART",
+      "type": "table",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated dm_sales_profit_mart.sql",
+      "startedAt": "2026-06-12 10:55:51",
+      "endedAt": "2026-06-12 10:57:01"
+    },
+    {
+      "id": "FCT_SALES",
+      "label": "FCT_SALES",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated fct_sales.sql",
+      "startedAt": "2026-06-12 10:55:53",
+      "endedAt": "2026-06-12 10:56:30"
+    },
+    {
+      "id": "FCT_INVENTORY",
+      "label": "FCT_INVENTORY",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated fct_inventory.sql",
+      "startedAt": "2026-06-12 10:56:30",
+      "endedAt": "2026-06-12 10:56:43"
+    },
+    {
+      "id": "FCT_GL",
+      "label": "FCT_GL",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated fct_gl.sql",
+      "startedAt": "2026-06-12 10:56:44",
+      "endedAt": "2026-06-12 10:56:59"
+    },
+    {
+      "id": "DIM_CUSTOMER",
+      "label": "DIM_CUSTOMER",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated dim_customer.sql",
+      "startedAt": "2026-06-12 10:56:03",
+      "endedAt": "2026-06-12 10:56:13"
+    },
+    {
+      "id": "STG_ORDERS",
+      "label": "STG_ORDERS",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_orders.sql",
+      "startedAt": "2026-06-12 10:55:56",
+      "endedAt": "2026-06-12 10:56:02"
+    },
+    {
+      "id": "DIM_ITEM",
+      "label": "DIM_ITEM",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated dim_item.sql",
+      "startedAt": "2026-06-12 10:56:13",
+      "endedAt": "2026-06-12 10:56:24"
+    },
+    {
+      "id": "DIM_DATE",
+      "label": "DIM_DATE",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated dim_date.sql",
+      "startedAt": "2026-06-12 10:56:25",
+      "endedAt": "2026-06-12 10:56:28"
+    },
+    {
+      "id": "ORDHDR_PF",
+      "label": "ORDHDR_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:55:57",
+      "endedAt": "2026-06-12 10:55:59"
+    },
+    {
+      "id": "ORDDTL_PF",
+      "label": "ORDDTL_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:55:59",
+      "endedAt": "2026-06-12 10:56:01"
+    },
+    {
+      "id": "STG_CUSTOMER",
+      "label": "STG_CUSTOMER",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_customer.sql",
+      "startedAt": "2026-06-12 10:56:04",
+      "endedAt": "2026-06-12 10:56:11"
+    },
+    {
+      "id": "CUSTMAST_PF",
+      "label": "CUSTMAST_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:06",
+      "endedAt": "2026-06-12 10:56:08"
+    },
+    {
+      "id": "REGION_PF",
+      "label": "REGION_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:08",
+      "endedAt": "2026-06-12 10:56:10"
+    },
+    {
+      "id": "STG_ITEM",
+      "label": "STG_ITEM",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_item.sql",
+      "startedAt": "2026-06-12 10:56:15",
+      "endedAt": "2026-06-12 10:56:23"
+    },
+    {
+      "id": "ITEMMAST_PF",
+      "label": "ITEMMAST_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:17",
+      "endedAt": "2026-06-12 10:56:19"
+    },
+    {
+      "id": "PRICELST_PF",
+      "label": "PRICELST_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:19",
+      "endedAt": "2026-06-12 10:56:21"
+    },
+    {
+      "id": "STG_INVENTORY",
+      "label": "STG_INVENTORY",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_inventory.sql",
+      "startedAt": "2026-06-12 10:56:32",
+      "endedAt": "2026-06-12 10:56:38"
+    },
+    {
+      "id": "INVTRANS_PF",
+      "label": "INVTRANS_PF",
+      "type": "cobol",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:34",
+      "endedAt": "2026-06-12 10:56:36"
+    },
+    {
+      "id": "STG_GL",
+      "label": "STG_GL",
+      "type": "sql",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_gl.sql",
+      "startedAt": "2026-06-12 10:56:46",
+      "endedAt": "2026-06-12 10:56:51"
+    },
+    {
+      "id": "STG_EMPLOYEE",
+      "label": "STG_EMPLOYEE",
+      "type": "python",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated stg_employee.py",
+      "startedAt": "2026-06-12 10:56:51",
+      "endedAt": "2026-06-12 10:56:57"
+    },
+    {
+      "id": "GLACCT_PF",
+      "label": "GLACCT_PF",
+      "type": "rpg",
+      "status": "done",
+      "progress": 100,
+      "detail": "DDL generated",
+      "startedAt": "2026-06-12 10:56:48",
+      "endedAt": "2026-06-12 10:56:49"
+    },
+    {
+      "id": "POSTCL_CL",
+      "label": "POSTCL_CL",
+      "type": "cl",
+      "status": "done",
+      "progress": 100,
+      "detail": "Generated post_gl.py",
+      "startedAt": "2026-06-12 10:56:54",
+      "endedAt": "2026-06-12 10:56:55"
+    }
+  ],
+  "edges": [
+    {
+      "from": "FCT_SALES",
+      "to": "DM_SALES_PROFIT_MART"
+    },
+    {
+      "from": "FCT_INVENTORY",
+      "to": "DM_SALES_PROFIT_MART"
+    },
+    {
+      "from": "FCT_GL",
+      "to": "DM_SALES_PROFIT_MART"
+    },
+    {
+      "from": "DIM_CUSTOMER",
+      "to": "DM_SALES_PROFIT_MART"
+    },
+    {
+      "from": "STG_ORDERS",
+      "to": "FCT_SALES"
+    },
+    {
+      "from": "DIM_CUSTOMER",
+      "to": "FCT_SALES"
+    },
+    {
+      "from": "DIM_ITEM",
+      "to": "FCT_SALES"
+    },
+    {
+      "from": "DIM_DATE",
+      "to": "FCT_SALES"
+    },
+    {
+      "from": "ORDHDR_PF",
+      "to": "STG_ORDERS"
+    },
+    {
+      "from": "ORDDTL_PF",
+      "to": "STG_ORDERS"
+    },
+    {
+      "from": "STG_CUSTOMER",
+      "to": "DIM_CUSTOMER"
+    },
+    {
+      "from": "CUSTMAST_PF",
+      "to": "STG_CUSTOMER"
+    },
+    {
+      "from": "REGION_PF",
+      "to": "STG_CUSTOMER"
+    },
+    {
+      "from": "STG_ITEM",
+      "to": "DIM_ITEM"
+    },
+    {
+      "from": "ITEMMAST_PF",
+      "to": "STG_ITEM"
+    },
+    {
+      "from": "PRICELST_PF",
+      "to": "STG_ITEM"
+    },
+    {
+      "from": "STG_ORDERS",
+      "to": "DIM_DATE"
+    },
+    {
+      "from": "STG_INVENTORY",
+      "to": "FCT_INVENTORY"
+    },
+    {
+      "from": "DIM_ITEM",
+      "to": "FCT_INVENTORY"
+    },
+    {
+      "from": "DIM_DATE",
+      "to": "FCT_INVENTORY"
+    },
+    {
+      "from": "INVTRANS_PF",
+      "to": "STG_INVENTORY"
+    },
+    {
+      "from": "ITEMMAST_PF",
+      "to": "STG_INVENTORY"
+    },
+    {
+      "from": "STG_GL",
+      "to": "FCT_GL"
+    },
+    {
+      "from": "STG_EMPLOYEE",
+      "to": "FCT_GL"
+    },
+    {
+      "from": "DIM_CUSTOMER",
+      "to": "FCT_GL"
+    },
+    {
+      "from": "DIM_DATE",
+      "to": "FCT_GL"
+    },
+    {
+      "from": "GLACCT_PF",
+      "to": "STG_GL"
+    },
+    {
+      "from": "CUSTMAST_PF",
+      "to": "STG_EMPLOYEE"
+    },
+    {
+      "from": "REGION_PF",
+      "to": "STG_EMPLOYEE"
+    },
+    {
+      "from": "POSTCL_CL",
+      "to": "STG_EMPLOYEE"
+    }
+  ],
+  "updatedAt": "2026-06-12 10:57:01"
+}
