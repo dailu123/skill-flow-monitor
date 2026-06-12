@@ -14,7 +14,9 @@
 参数：
   --repo      mca | hub（盯哪个队列）
   --batch     每轮让模型处理几个单元（默认 5；小批量=新鲜上下文=质量稳定）
-  --cli       CLI 命令（默认 "copilot"，可换成其他兼容 -p 的 agent CLI）
+  --profile   copilot | gemini（执行器方言：自动批准/信任目录/模型 的参数名不同）
+              没有 Copilot CLI 的话装免费的 Gemini CLI 也能跑：npm install -g @google/gemini-cli
+  --cli       覆盖 CLI 命令名（默认随 profile：copilot / gemini）
   --model     传给 CLI 的模型名（可选，省钱用快模型）
   --timeout   单轮超时秒数（默认 2400，超时杀掉进入下一轮）
   --max-runs  最多跑多少轮（默认 999，安全阀）
@@ -83,7 +85,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, choices=["mca", "hub"])
     ap.add_argument("--batch", type=int, default=5)
-    ap.add_argument("--cli", default="copilot")
+    ap.add_argument("--profile", choices=["copilot", "gemini"], default="copilot")
+    ap.add_argument("--cli", default="")
     ap.add_argument("--model", default="")
     ap.add_argument("--timeout", type=int, default=2400)
     ap.add_argument("--max-runs", type=int, default=999)
@@ -114,12 +117,27 @@ def main():
             stall = 0
         last_todo = c["TODO"]
 
-        cmd = args.cli.split() + ["-p", make_prompt(args.repo, args.batch), "--allow-all-tools"]
+        # 不同执行器的参数方言
+        prof = {
+            "copilot": {"bin": "copilot", "yolo": ["--allow-all-tools"],
+                        "dirs": "repeat:--add-dir", "model": "--model"},
+            "gemini": {"bin": "gemini", "yolo": ["--yolo"],
+                       "dirs": "comma:--include-directories", "model": "-m"},
+        }[args.profile]
+        cli = (args.cli or prof["bin"]).split()
+        cmd = cli + ["-p", make_prompt(args.repo, args.batch)] + prof["yolo"]
         src_root = repo_source_root(args.repo)
-        for d in dict.fromkeys(([src_root] if src_root and os.path.isdir(src_root) else []) + args.add_dir):
-            cmd += ["--add-dir", d]  # 源码在工作目录之外，必须进信任区，否则 CLI 会卡在目录授权上
+        dirs = list(dict.fromkeys(
+            ([src_root] if src_root and os.path.isdir(src_root) else []) + args.add_dir))
+        if dirs:  # 源码在工作目录之外，必须进信任区，否则 CLI 会卡在目录授权上
+            style, flag = prof["dirs"].split(":")
+            if style == "repeat":
+                for d in dirs:
+                    cmd += [flag, d]
+            else:
+                cmd += [flag, ",".join(dirs)]
         if args.model:
-            cmd += ["--model", args.model]
+            cmd += [prof["model"], args.model]
         log(args.repo, f"第 {run} 轮：剩 TODO {c['TODO']} / DONE {c['DONE']}，"
                        f"派发 {args.batch} 个单元...")
         try:
@@ -134,7 +152,8 @@ def main():
         except subprocess.TimeoutExpired:
             log(args.repo, f"第 {run} 轮超时（{args.timeout}s）已杀掉，断点会在下轮恢复。")
         except FileNotFoundError:
-            sys.exit(f"找不到命令 {args.cli!r}。请安装 Copilot CLI（npm install -g @github/copilot）"
+            sys.exit(f"找不到命令 {cli[0]!r}。安装其一：Copilot CLI（npm install -g @github/copilot）"
+                     f"或 Gemini CLI（npm install -g @google/gemini-cli，免费），"
                      f"或用 --cli 指定你的 agent 命令。")
         time.sleep(3)
 
