@@ -271,8 +271,11 @@ PARITY_STATUS = {"both": "done", "mca-only": "error", "hub-only": "error",
                  "uncertain": "pending", "": "pending"}
 
 
-def build_lineage():
+def build_lineage(mode="gaps"):
+    """mode=gaps 只画 parity!=both 的缺口项（图的正确用法：少量重点）；mode=all 全画。"""
     rows = cap_rows()
+    if mode == "gaps":
+        rows = [r for r in rows if (r.get("parity") or "").strip().lower() != "both"]
     if not rows:
         return None
     nodes, edges, seen = [], [], set()
@@ -314,6 +317,49 @@ def build_lineage():
     return {"target": "REPORT", "nodes": nodes, "edges": edges, "updatedAt": now()}
 
 
+PARITY_CN = {"both": ("两边都有", "#1e8e3e"), "mca-only": ("仅 MCA", "#d93025"),
+             "hub-only": ("仅 HUB", "#d93025"), "uncertain": ("未确认", "#9aa0a6")}
+
+
+def build_matrix_html():
+    """能力对齐矩阵：映射关系的主视图（图只留给缺口）。"""
+    rows = cap_rows()
+    cnt = {}
+    for r in rows:
+        p = (r.get("parity") or "uncertain").strip().lower()
+        cnt[p] = cnt.get(p, 0) + 1
+    body = []
+    for r in sorted(rows, key=lambda x: ((x.get("domain") or ""), x.get("capability") or "")):
+        p = (r.get("parity") or "uncertain").strip().lower()
+        label, color = PARITY_CN.get(p, (p, "#9aa0a6"))
+        def esc(k):
+            return (r.get(k) or "").replace("&", "&amp;").replace("<", "&lt;")
+        body.append(
+            f'<tr class="{p}"><td>{esc("domain")}</td><td><b>{esc("capability")}</b></td>'
+            f'<td><span class="badge" style="background:{color}">{label}</span></td>'
+            f'<td>{esc("mca_modules")}<div class="ev">{esc("mca_evidence")}</div></td>'
+            f'<td>{esc("hub_modules")}<div class="ev">{esc("hub_evidence")}</div></td>'
+            f'<td>{esc("note")}</td></tr>')
+    summary = " · ".join(f"{PARITY_CN.get(k, (k,))[0]} {v}" for k, v in sorted(cnt.items()))
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<title>业务能力对齐矩阵</title><style>
+body{{font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:24px;color:#202124}}
+h1{{font-size:18px}} .sub{{color:#5f6368;margin-bottom:12px}}
+input{{padding:6px 10px;width:280px;margin-bottom:12px;border:1px solid #dadce0;border-radius:6px}}
+table{{border-collapse:collapse;width:100%}} th,td{{border:1px solid #e0e0e0;padding:6px 10px;
+text-align:left;vertical-align:top}} th{{background:#f1f3f4;position:sticky;top:0}}
+tr.mca-only td,tr.hub-only td{{background:#fce8e6}} tr.both td{{background:#e6f4ea}}
+.badge{{color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;white-space:nowrap}}
+.ev{{color:#5f6368;font-size:12px}}</style></head><body>
+<h1>业务能力对齐矩阵（MCA ↔ HUB）</h1>
+<div class="sub">{summary}　|　生成于 {now()}　|　数据源 evidence/capabilities.csv（改完 F5 刷新）</div>
+<input placeholder="过滤：能力 / 域 / 模块名..." oninput="
+var q=this.value.toLowerCase();document.querySelectorAll('tbody tr').forEach(function(t){{
+t.style.display=t.textContent.toLowerCase().indexOf(q)>=0?'':'none'}})">
+<table><thead><tr><th>业务域</th><th>能力</th><th>对齐</th><th>MCA(Java)</th><th>HUB(AS400)</th>
+<th>备注</th></tr></thead><tbody>{''.join(body)}</tbody></table></body></html>"""
+
+
 def write_json(path, payload):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -324,12 +370,17 @@ def render(args):
     pipeline = build_overview() if args.view == "overview" else build_repo_view(args.view)
     write_json(os.path.join(args.out_dir, "pipeline.json"), pipeline)
     msg = f"[{now()}] pipeline.json({args.view}): {len(pipeline['skills'])} 节点"
-    lineage = build_lineage()
+    lineage = build_lineage(args.lineage)
     if lineage:
         write_json(os.path.join(args.out_dir, "lineage.json"), lineage)
-        msg += f" | lineage.json: {len(lineage['nodes'])} 节点"
+        msg += f" | lineage.json({args.lineage}): {len(lineage['nodes'])} 节点"
     else:
-        msg += " | capabilities.csv 还没有数据，跳过 lineage.json"
+        msg += " | 无缺口可画（或 capabilities.csv 还没数据），跳过 lineage.json"
+    if cap_rows():
+        html = build_matrix_html()
+        with open(os.path.join(args.out_dir, "matrix.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+        msg += " | matrix.html 已生成"
     print(msg)
 
 
@@ -337,6 +388,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", required=True, help="skillflow-monitor/public/status 目录")
     ap.add_argument("--view", choices=["overview", "mca", "hub"], default="overview")
+    ap.add_argument("--lineage", choices=["gaps", "all"], default="gaps",
+                    help="血缘图画什么：gaps=只画缺口(默认，图才看得清)；all=全画")
     ap.add_argument("--watch", type=int, default=0)
     args = ap.parse_args()
 
