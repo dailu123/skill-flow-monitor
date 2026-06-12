@@ -59,25 +59,45 @@ def dir_of(rel):
     return rel.rsplit("/", 1)[0] if "/" in rel else "."
 
 
-def write_map(ws, name, root, src, entries):
+def write_map(ws, name, root, src, entries, min_files, top):
     by_ext = Counter(f.rsplit(".", 1)[-1].lower() for f in src)
     by_dir = Counter(dir_of(f) for f in src)
+    excluded = {d: n for d, n in by_dir.items() if n < min_files}
+    excl_files = sum(excluded.values())
+    covered_pct = round(100 * (len(src) - excl_files) / len(src), 1) if src else 0
     lines = [
         f"# 目录地图（MAP）— {name}\n",
         f"> 由 bootstrap.py 生成于 {date.today().isoformat()}。仓库根：{os.path.abspath(root)}",
-        "> 这是“目录索引”，不是细节。细节看 notes/。\n",
+        "> 这是“目录索引”，不是细节。细节看 notes/，完整任务清单看 PROGRESS.md。\n",
         "## 规模概览\n```",
         f"源码文件总数: {len(src)}\n",
         "按扩展名:",
     ]
     lines += [f"  {n:>7}  .{e}" for e, n in by_ext.most_common()]
-    lines += ["```\n", "## 各目录代码量（按文件数排序，前 80）\n```"]
-    lines += [f"  {n:>7}  {d}" for d, n in by_dir.most_common(80)]
+    lines += ["```\n",
+              "## 覆盖率（印证用）\n```",
+              f"目录总数: {len(by_dir)}",
+              f"进入任务队列: {len(by_dir) - len(excluded)} 个目录 / {len(src) - excl_files} 个文件（覆盖 {covered_pct}%）",
+              f"被 --min {min_files} 排除: {len(excluded)} 个目录 / {excl_files} 个文件",
+              "```"]
+    if excluded:
+        lines += ["", f"被排除的目录（人工确认这些可以不分析；不行就调小 --min 重跑）:", "```"]
+        lines += [f"  {n:>7}  {d}" for d, n in sorted(excluded.items(), key=lambda x: -x[1])[:50]]
+        if len(excluded) > 50:
+            lines += [f"  ... 还有 {len(excluded) - 50} 个，完整清单见 MAP-excluded.txt"]
+        lines += ["```"]
+        with open(os.path.join(ws, "MAP-excluded.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(f"{n}\t{d}" for d, n in sorted(excluded.items(), key=lambda x: -x[1])) + "\n")
+    lines += ["", f"## 各目录代码量（按文件数排序，前 {top}；完整目录清单见 MAP-dirs.txt）\n```"]
+    lines += [f"  {n:>7}  {d}" for d, n in by_dir.most_common(top)]
     lines += ["```\n", "## 可能的入口/构建文件\n```"]
     lines += [f"  {e}" for e in entries[:40]] or ["  (未识别到)"]
     lines += ["```"]
     with open(os.path.join(ws, "MAP.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+    # 不省略的全量目录清单（给人审计 / 给模型按需 grep，不占上下文）
+    with open(os.path.join(ws, "MAP-dirs.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(f"{n}\t{d}" for d, n in by_dir.most_common()) + "\n")
 
 
 def write_progress(ws, name, root, src, min_files, chunk):
@@ -132,6 +152,7 @@ def main():
     ap.add_argument("--exts", default="")
     ap.add_argument("--min", type=int, default=3)
     ap.add_argument("--chunk", type=int, default=50)
+    ap.add_argument("--top", type=int, default=80, help="MAP.md 里目录排行显示多少行")
     args = ap.parse_args()
 
     exts_str = args.exts or PRESETS[args.preset]
@@ -145,7 +166,7 @@ def main():
 
     print(f"扫描 {args.root} （preset={args.preset}）...")
     src, entries = collect(args.root, exts)
-    write_map(ws, args.name, args.root, src, entries)
+    write_map(ws, args.name, args.root, src, entries, args.min, args.top)
     n_units = write_progress(ws, args.name, args.root, src, args.min, args.chunk)
 
     print(f"完成：{len(src)} 个源码文件 → {n_units} 个分析单元")
