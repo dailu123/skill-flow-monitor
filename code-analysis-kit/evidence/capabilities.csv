@@ -1,0 +1,2 @@
+capability,domain,mca_modules,hub_modules,parity,mca_evidence,hub_evidence,note
+示例-客户主档维护(请替换),客户管理,src/main/java/com/x/customer,QRPGSRC,both,CustomerController.java:25,CUSTMNT.RPGLE:1,两边都有完整CRUD

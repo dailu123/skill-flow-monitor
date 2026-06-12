@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+把双库分析进度渲染成 skillflow-monitor 的两个 JSON：
+
+  pipeline.json  ← --view 决定内容：
+      overview  双分支总览（MCA分支 + HUB分支 → 对比 → 业务报告）
+      mca / hub 该仓库的目录地图（节点=目录，颜色=分析状态）
+  lineage.json   ← 永远由 evidence/capabilities.csv 生成：
+      业务能力对齐图（两边模块 → 业务能力 → 对比报告；单边缺失=红色）
+
+用法（Windows）：
+  python code-analysis-kit\\render_status.py --out-dir skillflow-monitor\\public\\status
+  python code-analysis-kit\\render_status.py --out-dir ... --view mca
+  python code-analysis-kit\\render_status.py --out-dir ... --watch 2      # 实时刷新
+"""
+import argparse
+import csv
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime
+
+KIT = os.path.dirname(os.path.abspath(__file__))
+STATUS_MAP = {"TODO": "pending", "IN_PROGRESS": "running", "DONE": "done",
+              "ERROR": "error", "SKIP": "skipped"}
+PCT = {"pending": 0, "running": 50, "done": 100, "error": 0, "skipped": 0}
+REPO_CHIP = {"mca": "sql", "hub": "rpg"}  # 节点彩色小标签：蓝=MCA(Java)，紫=HUB(AS400)
+
+
+def now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def nid(prefix, s):
+    return prefix + "_" + re.sub(r"[^0-9A-Za-z]", "_", s)
+
+
+def parse_progress(name):
+    """读 work/<name>/PROGRESS.md，返回单元列表 [{id,dir,count,status,...}]。"""
+    path = os.path.join(KIT, "work", name, "PROGRESS.md")
+    units = []
+    if not os.path.exists(path):
+        return units
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if not line.lstrip().startswith("|"):
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) < 4 or cells[0].upper() == "ID" or set(cells[0]) <= set("-: "):
+                continue
+            status = STATUS_MAP.get(cells[3].upper().replace(" ", "_"))
+            if status is None:
+                continue
+            # 单元名可能带 “ [块k/n]” 后缀，目录取前半段
+            d = re.sub(r"\s*\[块\d+/\d+\]\s*$", "", cells[1]).lstrip("./")
+            units.append({
+                "id": cells[0], "dir": d, "label": cells[1],
+                "count": int(cells[2]) if cells[2].isdigit() else 0,
+                "status": status,
+                "filelist": cells[4] if len(cells) > 4 else "",
+                "note": cells[5] if len(cells) > 5 else "",
+                "summary": cells[6] if len(cells) > 6 else "",
+            })
+    return units
+
+
+def report_exists(fn):
+    return os.path.exists(os.path.join(KIT, "reports", fn))
+
+
+def cap_rows():
+    """读 evidence/capabilities.csv（容忍 Excel 的 BOM）。"""
+    path = os.path.join(KIT, "evidence", "capabilities.csv")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return [r for r in csv.DictReader(f) if (r.get("capability") or "").strip()]
+
+
+# ---------- 总览视图 ----------
+def phase_node(pid, name, status, progress, detail):
+    return {"id": pid, "name": name, "type": "skill", "status": status,
+            "progress": progress, "detail": detail}
+
+
+def repo_phase(name, cn):
+    """一个仓库分支的三个阶段节点。"""
+    units = parse_progress(name)
+    total = len(units)
+    done = sum(1 for u in units if u["status"] == "done")
+    running = sum(1 for u in units if u["status"] == "running")
+
+    map_st = "done" if total else "pending"
+    if done == total and total:
+        ana_st, ana_pct = "done", 100
+    elif running or done:
+        ana_st, ana_pct = "running", round(100 * done / total) if total else 0
+    else:
+        ana_st, ana_pct = "pending", 0
+    arch_fn = f"ARCH-{name}.md"
+    arch_st = "done" if report_exists(arch_fn) else ("running" if ana_st == "done" else "pending")
+
+    return [
+        phase_node(f"{name}-map", f"{cn} 地图扫描", map_st, PCT[map_st],
+                   f"{total} 个分析单元" if total else "待 bootstrap"),
+        phase_node(f"{name}-analyze", f"{cn} 模块分析", ana_st, ana_pct,
+                   f"{done}/{total} 单元完成"),
+        phase_node(f"{name}-arch", f"{cn} 架构汇总", arch_st, PCT[arch_st],
+                   f"reports/{arch_fn}"),
+    ], [
+        {"from": f"{name}-map", "to": f"{name}-analyze"},
+        {"from": f"{name}-analyze", "to": f"{name}-arch"},
+    ]
+
+
+def build_overview():
+    n_m, e_m = repo_phase("mca", "MCA(Java)")
+    n_h, e_h = repo_phase("hub", "HUB(AS400)")
+    caps = cap_rows()
+    both_arch = report_exists("ARCH-mca.md") and report_exists("ARCH-hub.md")
+    cmp_st = "done" if report_exists("COMPARE.md") else ("running" if both_arch else "pending")
+    biz_st = "done" if report_exists("BUSINESS.md") else ("running" if cmp_st == "done" else "pending")
+    nodes = n_m + n_h + [
+        phase_node("compare", "交叉对比", cmp_st, PCT[cmp_st],
+                   f"{len(caps)} 项业务能力已对齐"),
+        phase_node("business", "业务视角报告", biz_st, PCT[biz_st], "reports/BUSINESS.md"),
+    ]
+    edges = e_m + e_h + [
+        {"from": "mca-arch", "to": "compare"},
+        {"from": "hub-arch", "to": "compare"},
+        {"from": "compare", "to": "business"},
+    ]
+    return {"title": "MCA(Java) vs HUB(AS400) 双库对比分析",
+            "skills": nodes, "edges": edges, "updatedAt": now()}
+
+
+# ---------- 单仓库目录视图 ----------
+def build_repo_view(name):
+    units = parse_progress(name)
+    by_dir = {}
+    for u in units:
+        by_dir.setdefault(u["dir"], []).append(u)
+
+    chip = REPO_CHIP.get(name, "file")
+    nodes, dirset = [], set(by_dir)
+    for d, us in sorted(by_dir.items()):
+        sts = [u["status"] for u in us]
+        if all(s == "done" for s in sts):
+            st = "done"
+        elif "error" in sts:
+            st = "error"
+        elif any(s in ("running", "done") for s in sts):
+            st = "running"
+        else:
+            st = "pending"
+        pct = round(sum(PCT[s] for s in sts) / len(sts))
+        summary = next((u["summary"] for u in us if u["summary"]), "")
+        n_files = sum(u["count"] for u in us)
+        detail = summary or (f"{n_files} 文件 · {len(us)} 块" if len(us) > 1 else f"{n_files} 个源码文件")
+        nodes.append({"id": nid("d", d), "name": d.split("/")[-1] if d != "." else "(root)",
+                      "type": chip, "status": st, "progress": pct, "detail": detail})
+
+    edges = []
+    for d in by_dir:
+        parts = d.split("/")
+        for i in range(len(parts) - 1, 0, -1):
+            anc = "/".join(parts[:i])
+            if anc in dirset:
+                edges.append({"from": nid("d", anc), "to": nid("d", d)})
+                break
+    title_cn = {"mca": "MCA(Java) 代码地图", "hub": "HUB(AS400) 代码地图"}.get(name, f"{name} 代码地图")
+    return {"title": title_cn, "skills": nodes, "edges": edges, "updatedAt": now()}
+
+
+# ---------- 业务能力对齐图（lineage.json） ----------
+PARITY_STATUS = {"both": "done", "mca-only": "error", "hub-only": "error",
+                 "uncertain": "pending", "": "pending"}
+
+
+def build_lineage():
+    rows = cap_rows()
+    if not rows:
+        return None
+    nodes, edges, seen = [], [], set()
+    known_dirs = {u["dir"] for u in parse_progress("mca")} | {u["dir"] for u in parse_progress("hub")}
+
+    cmp_done = report_exists("COMPARE.md")
+    nodes.append({"id": "REPORT", "label": "对比报告", "type": "table",
+                  "status": "done" if cmp_done else "pending",
+                  "progress": 100 if cmp_done else 0, "detail": "reports/COMPARE.md"})
+
+    for r in rows:
+        cap = r["capability"].strip()
+        parity = (r.get("parity") or "").strip().lower()
+        cid = nid("cap", cap)
+        st = PARITY_STATUS.get(parity, "pending")
+        detail = (r.get("note") or "").strip() or {"both": "两边都有", "mca-only": "仅 MCA 有",
+                                                   "hub-only": "仅 HUB 有"}.get(parity, "未确认")
+        nodes.append({"id": cid, "label": cap, "type": "table", "status": st,
+                      "progress": PCT[st], "detail": f"[{r.get('domain','')}] {detail}".strip()})
+        edges.append({"from": cid, "to": "REPORT"})
+
+        for side, col, ev_col in (("mca", "mca_modules", "mca_evidence"),
+                                  ("hub", "hub_modules", "hub_evidence")):
+            for mod in (r.get(col) or "").split(";"):
+                mod = mod.strip().lstrip("./")
+                if not mod:
+                    continue
+                mid = nid(side, mod)
+                if mid not in seen:
+                    seen.add(mid)
+                    warn = "" if (mod in known_dirs or not known_dirs) else " ⚠未在队列中"
+                    nodes.append({"id": mid, "label": f"{side.upper()}:{mod.split('/')[-1]}",
+                                  "type": REPO_CHIP[side], "status": "done", "progress": 100,
+                                  "detail": (r.get(ev_col) or mod)[:80] + warn})
+                    if warn:
+                        print(f"  [印证警告] 能力「{cap}」引用的 {side} 模块不在任务队列里: {mod}")
+                edges.append({"from": mid, "to": cid})
+
+    return {"target": "REPORT", "nodes": nodes, "edges": edges, "updatedAt": now()}
+
+
+def write_json(path, payload):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def render(args):
+    pipeline = build_overview() if args.view == "overview" else build_repo_view(args.view)
+    write_json(os.path.join(args.out_dir, "pipeline.json"), pipeline)
+    msg = f"[{now()}] pipeline.json({args.view}): {len(pipeline['skills'])} 节点"
+    lineage = build_lineage()
+    if lineage:
+        write_json(os.path.join(args.out_dir, "lineage.json"), lineage)
+        msg += f" | lineage.json: {len(lineage['nodes'])} 节点"
+    else:
+        msg += " | capabilities.csv 还没有数据，跳过 lineage.json"
+    print(msg)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out-dir", required=True, help="skillflow-monitor/public/status 目录")
+    ap.add_argument("--view", choices=["overview", "mca", "hub"], default="overview")
+    ap.add_argument("--watch", type=int, default=0)
+    args = ap.parse_args()
+
+    if args.watch > 0:
+        print(f"watch 模式：每 {args.watch}s 刷新，Ctrl+C 退出。")
+        try:
+            while True:
+                render(args)
+                time.sleep(args.watch)
+        except KeyboardInterrupt:
+            sys.exit(0)
+    else:
+        render(args)
+
+
+if __name__ == "__main__":
+    main()
