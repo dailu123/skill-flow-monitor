@@ -102,19 +102,38 @@ def repo_phase(name, cn):
         ana_st, ana_pct = "running", round(100 * done / eff) if eff else 0
     else:
         ana_st, ana_pct = "pending", 0
+    # 阶段A2：调用链穿刺（evidence/<name>/traces/）
+    tr_dir = os.path.join(KIT, "evidence", name, "traces")
+    n_tr = len([f for f in os.listdir(tr_dir)
+                if f.lower().endswith(".md") and not f.startswith("_")]) if os.path.isdir(tr_dir) else 0
+    idx = os.path.join(tr_dir, "_INDEX.md")
+    idx_complete = False
+    if os.path.exists(idx):
+        with open(idx, encoding="utf-8") as fh:
+            idx_complete = "STATUS: COMPLETE" in fh.read()
+    if idx_complete and n_tr:
+        tr_st, tr_pct = "done", 100
+    elif n_tr or ana_st == "done":
+        tr_st, tr_pct = "running", min(95, n_tr * 10)
+    else:
+        tr_st, tr_pct = "pending", 0
+
     arch_fn = f"ARCH-{name}.md"
-    arch_st = "done" if report_exists(arch_fn) else ("running" if ana_st == "done" else "pending")
+    arch_st = "done" if report_exists(arch_fn) else ("running" if tr_st == "done" else "pending")
 
     return [
         phase_node(f"{name}-map", f"{cn} 地图扫描", map_st, PCT[map_st],
                    f"{total} 个分析单元" if total else "待 bootstrap"),
         phase_node(f"{name}-analyze", f"{cn} 模块分析", ana_st, ana_pct,
                    f"{done}/{eff} 单元完成" + (f"（另 {skipped} 个已跳过）" if skipped else "")),
+        phase_node(f"{name}-trace", f"{cn} 调用链穿刺", tr_st, tr_pct,
+                   f"{n_tr} 条业务链已穿刺"),
         phase_node(f"{name}-arch", f"{cn} 架构汇总", arch_st, PCT[arch_st],
                    f"reports/{arch_fn}"),
     ], [
         {"from": f"{name}-map", "to": f"{name}-analyze"},
-        {"from": f"{name}-analyze", "to": f"{name}-arch"},
+        {"from": f"{name}-analyze", "to": f"{name}-trace"},
+        {"from": f"{name}-trace", "to": f"{name}-arch"},
     ]
 
 

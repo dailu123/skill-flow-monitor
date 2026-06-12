@@ -9,7 +9,8 @@
 
 ## 总流程（阶段制）
     阶段A  逐单元分析 mca 和 hub（两边独立，可在不同会话分头跑）
-    阶段B  各自汇总：reports/ARCH-mca.md、reports/ARCH-hub.md（只读笔记，不读源码）
+    阶段A2 调用链穿刺：每侧选 Top 10~20 业务入口，沿链写 trace（evidence/<repo>/traces/）
+    阶段B  各自汇总：reports/ARCH-mca.md、reports/ARCH-hub.md（只读笔记+trace，不读源码）
     阶段C  交叉对比：填 evidence/capabilities.csv → 写 reports/COMPARE.md
     阶段D  业务报告：reports/BUSINESS.md（面向非技术读者）
 每轮开始时自检：当前处于哪个阶段？依据 = work/*/PROGRESS.md 的完成度 + reports/ 下已有哪些文件。
@@ -50,8 +51,19 @@
     kind 取值：endpoint(接口/界面) | program(类/RPG程序) | table(表/PF) | job(定时/CL作业)
     示例：table,CUSTMAST,src/dds/CUSTMAST.PF:1,客户主档
 
-## 阶段B：架构汇总（某仓库全部 DONE 后）
-只读 notes/<repo>/ 的全部笔记（不回头读源码），产出 reports/ARCH-<repo>.md：
+## 阶段A2：调用链穿刺（该仓库 PROGRESS 全部 DONE 后、写 ARCH 之前）
+横向清点保证了"全"，穿刺保证"通"——业务流程级对比的证据全靠这里。
+1. **选入口**：MCA 从 work/mca/SYMBOLS.txt 的 endpoint 行 + 定时任务(@Scheduled/quartz配置)选；
+   HUB 从 DSPF 屏幕和 CL 作业链选。每侧 10~20 条，覆盖核心业务域（客户/订单/库存/财务…）。
+   入口清单先写 evidence/<repo>/traces/_INDEX.md（一行一条：编号、入口、业务名、状态）。
+2. **一轮只穿一条链**（和阶段A的"一轮一单元"同理）：从入口出发，用 SYMBOLS.txt 和
+   notes/ 当导航，只在关键跳转点精读源码。产出 evidence/<repo>/traces/T01-<业务名>.md：
+       入口（文件:行号）→ 每步跳转（文件:行号 + 一句话干了什么）→ 读写哪些表 → 副作用/分支
+   链上发现的新跨模块依赖照旧追加 relations.csv。
+3. 全部穿完在 _INDEX.md 顶部写 STATUS: COMPLETE，再进入阶段B。
+
+## 阶段B：架构汇总（某仓库 trace 完成后）
+只读 notes/<repo>/ 的全部笔记和 evidence/<repo>/traces/（不回头读源码），产出 reports/ARCH-<repo>.md：
 分层架构、模块依赖、核心数据模型（表清单引用 inventory.csv）、对外接口清单、
 核心业务流程 Top 10、风险清单。每节末尾注明“依据：哪些笔记”。
 
@@ -63,12 +75,13 @@
    - parity：both | mca-only | hub-only | uncertain
    - evidence：文件:行号 或 inventory.csv 中的条目名
 3. 写 reports/COMPARE.md：技术栈对比、架构对比、数据模型对照表（两边表名映射）、
-   接口对照表、功能覆盖矩阵（直接由 capabilities.csv 汇总）、差异与风险。
+   接口对照表、功能覆盖矩阵（直接由 capabilities.csv 汇总）、**业务流程对照**（同一业务
+   两边各走哪条链，逐条引用两边的 traces/Txx 文件名）、差异与风险。
    **报告中的每个数字必须能由某个 CSV 重新数出来**（如“HUB 有 214 张物理文件” = inventory.csv 中 kind=table 行数）。
 
 ## 阶段D：业务视角报告
 写 reports/BUSINESS.md，面向不懂代码的业务读者：两套系统各承担什么业务、业务能力
-重叠与缺口（按 capabilities.csv 的 both/only 统计）、同一业务流程在两边的走法差异、
+重叠与缺口（按 capabilities.csv 的 both/only 统计）、同一业务流程在两边的走法差异（依据 traces/，标注 trace 编号）、
 合并/迁移/共存的建议与依据。不出现代码细节，但每个论断标注 capabilities.csv 的行号。
 完成后把两个 PROGRESS.md 顶部 STATUS 改为 COMPLETE。
 
