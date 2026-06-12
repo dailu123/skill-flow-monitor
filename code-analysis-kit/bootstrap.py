@@ -53,8 +53,15 @@ ENTRY_STEMS = {"main", "app", "index", "cli", "server", "application"}
 def collect(root, exts):
     src, entries = [], []
     root = os.path.abspath(root)
+    visited = set()  # 防 Windows junction / 符号链接造成的死循环
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS and not d.startswith(".")]
+        real = os.path.realpath(dirpath)
+        if real in visited:
+            dirnames[:] = []
+            continue
+        visited.add(real)
+        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS and not d.startswith(".")
+                       and not os.path.islink(os.path.join(dirpath, d))]
         for fn in filenames:
             ext = fn.rsplit(".", 1)[-1].lower() if "." in fn else ""
             rel = os.path.relpath(os.path.join(dirpath, fn), root).replace("\\", "/")
@@ -96,14 +103,25 @@ RE_RPG_CALL = re.compile(r"\bCALL\b\s+(?:PGM\()?'?([A-Z0-9_$#@]+)'?\)?", re.I)
 RE_DDS_REC = re.compile(r"^\s*A\s+R\s+([A-Z0-9_$#@]+)", re.I | re.M)
 
 
+MAX_SCAN_BYTES = 4 * 1024 * 1024  # 单文件最多解析前 4MB（源码文件不可能这么大；大的是dump/日志）
+
+
 def scan_file(path, ext, stem):
-    """读一遍文件，返回 (行数, [(kind, name), ...])。正则是启发式，够用即可。"""
+    """读一遍文件，返回 (行数, [(kind, name), ...])。正则是启发式，够用即可。
+    超过 MAX_SCAN_BYTES 的部分只数行数，不再做符号提取，防止数据 dump 卡死扫描。"""
     try:
-        with open(path, encoding="utf-8", errors="ignore") as f:
-            text = f.read()
+        with open(path, "rb") as fb:
+            data = fb.read(MAX_SCAN_BYTES)
+            extra = 0
+            while True:  # 剩余部分流式数行，不进内存
+                chunk = fb.read(1 << 20)
+                if not chunk:
+                    break
+                extra += chunk.count(b"\n")
+        text = data.decode("utf-8", errors="ignore")
     except OSError:
         return 0, []
-    loc = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+    loc = text.count("\n") + extra + (1 if text and not text.endswith("\n") else 0)
     syms = []
     if ext in JAVA_EXT:
         syms += [("type", n) for n in RE_JAVA_TYPE.findall(text)]
@@ -132,7 +150,10 @@ def scan_contents(root, src):
     sym_cnt = Counter()  # (dir, kind) -> n
     sym_lines = []
     root = os.path.abspath(root)
-    for rel in src:
+    total = len(src)
+    for i, rel in enumerate(src, 1):
+        if i % 2000 == 0 or i == total:
+            print(f"  ... {i}/{total} 文件已扫描", flush=True)
         d = dir_of(rel)
         ext = ext_of(rel)
         stem = rel.rsplit("/", 1)[-1].rsplit(".", 1)[0]
@@ -330,7 +351,7 @@ def main():
     os.makedirs(os.path.join(kit, "notes", args.name), exist_ok=True)
     os.makedirs(os.path.join(kit, "evidence", args.name), exist_ok=True)
 
-    print(f"扫描 {args.root} （preset={args.preset}）...")
+    print(f"扫描 {args.root} （preset={args.preset}）...", flush=True)
     src, entries = collect(args.root, exts)
 
     by_dir = {}
@@ -340,7 +361,7 @@ def main():
     if args.no_scan:
         loc_by_dir, sym_cnt, sym_lines = Counter(), Counter(), []
     else:
-        print("内容扫描（LOC + 符号索引）...")
+        print(f"内容扫描 {len(src)} 个文件（LOC + 符号索引）...", flush=True)
         loc_by_dir, sym_cnt, sym_lines = scan_contents(args.root, src)
         with open(os.path.join(ws, "SYMBOLS.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(sym_lines) + "\n")
