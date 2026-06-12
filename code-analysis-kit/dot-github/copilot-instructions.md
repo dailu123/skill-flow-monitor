@@ -30,7 +30,8 @@
 ## LOOP PROTOCOL（阶段A，每轮严格执行）
     第1步  确定当前仓库 R（用户指定；没指定就选 PROGRESS 完成度低的那个）。
     第2步  读 work/R/PROGRESS.md → 取第一个 TODO 单元 U，改成 IN_PROGRESS。
-    第3步  读 U 的文件（目录全部文件，或 chunks 清单里的文件）。大文件先抓签名：
+    第3步  先查 work/R/SYMBOLS.txt（grep 本单元的文件路径），拿到类/端点/表/CALL清单后
+           带着问题读源码。读 U 的文件（目录全部文件，或 chunks 清单里的文件）。大文件先抓签名：
            Java 看 class/interface/public 方法/注解(@RestController/@Service/@Entity)；
            AS/400 看 F 卡(文件声明)/CALL/PARM/EXEC SQL/DDS 字段。
     第4步  写笔记 notes/R/<U的ID>-<目录名>.md（模板：notes/_TEMPLATE.md）。
