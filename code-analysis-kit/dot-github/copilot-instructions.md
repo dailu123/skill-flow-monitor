@@ -74,7 +74,9 @@
    - mca_modules/hub_modules：支撑该能力的目录，多个用分号分隔（必须是 PROGRESS 里出现过的目录）
    - parity：both | mca-only | hub-only | uncertain
    - evidence：文件:行号 或 inventory.csv 中的条目名
-3. 写 reports/COMPARE.md：技术栈对比、架构对比、数据模型对照表（两边表名映射）、
+3. 数据模型对照优先用机器提取的 evidence/hub/tables.csv（PF 全字段清单）对照 MCA 侧
+   @Table/DDL 清单——不要回头读 DDS 源码。
+4. 写 reports/COMPARE.md：技术栈对比、架构对比、数据模型对照表（两边表名映射）、
    接口对照表、功能覆盖矩阵（直接由 capabilities.csv 汇总）、**业务流程对照**（同一业务
    两边各走哪条链，逐条引用两边的 traces/Txx 文件名）、差异与风险。
    **报告中的每个数字必须能由某个 CSV 重新数出来**（如“HUB 有 214 张物理文件” = inventory.csv 中 kind=table 行数）。
