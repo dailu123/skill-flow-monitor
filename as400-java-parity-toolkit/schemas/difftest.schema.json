@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/difftest.schema.json",
+  "title": "Diff Test Spec",
+  "description": "运行时差异测试规格(oracle)。同一输入喂两侧,比对输出与数据扫描。本工具不执行测试,只产出可执行的规格。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test_id", "mapping_id", "targets", "inputs", "compare", "expected_source"],
+  "properties": {
+    "test_id": { "type": "string" },
+    "mapping_id": { "type": "string" },
+    "title": { "type": "string" },
+    "covers_rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "覆盖的 rule-diff rule_id,用于把测试结果回填到规则判定。"
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as400", "java"],
+      "properties": {
+        "as400": { "type": "string", "description": "AS400 侧被测程序/事务入口。" },
+        "java": { "type": "string", "description": "Java 侧被测入口(类#方法或服务端点)。" }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "测试输入用例。应包含针对缺陷类的边界用例(空集、溢出、世纪窗口、figurative constant 等)。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "params"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "purpose": { "type": "string", "description": "该用例针对的缺陷类/边界。" },
+          "params": { "type": "object" },
+          "seed_data": { "type": "array", "items": { "type": "object" }, "description": "前置库内数据(可选)。" }
+        }
+      }
+    },
+    "compare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outputs", "data_scan"],
+      "properties": {
+        "outputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "需逐字段比对的输出字段。"
+        },
+        "data_scan": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["table"],
+            "properties": {
+              "table": { "type": "string" },
+              "columns": { "type": "array", "items": { "type": "string" } },
+              "where": { "type": "string" }
+            }
+          },
+          "description": "执行后对库表的扫描比对(捕捉副作用差异,如逻辑删除标记)。"
+        },
+        "tolerance": {
+          "type": "object",
+          "description": "字段级容差;packed/zoned 精度通常应为 0 容差,显式声明以暴露舍入差异。",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "expected_source": {
+      "type": "string",
+      "enum": ["as400_is_oracle", "captured_runtime", "manual"],
+      "description": "期望来源:以 AS400 为 oracle / 已捕获运行时 / 人工指定。"
+    },
+    "notes": { "type": "string" }
+  }
+}

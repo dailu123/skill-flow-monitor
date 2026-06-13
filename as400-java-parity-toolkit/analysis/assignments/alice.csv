@@ -1,0 +1,2 @@
+unit_id,side,path,risk,est_tokens,prompt,status,artifact
+AS4-0001-CALCDISC,as400,samples/as400/CALCDISC.sqlrpgle,low,1300,/extract-semantics,todo,analysis/semantics/AS4-0001-CALCDISC.json

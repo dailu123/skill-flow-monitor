@@ -1,0 +1,27 @@
+{
+  "mapping_id": "MAP-001",
+  "pair_verdict": "different",
+  "rules": [
+    {
+      "rule_id": "R001",
+      "as400_assertion": "仅当客户存在且 DEL_STS <> 'D' 时才算折扣",
+      "java_assertion": "仅当客户存在(c != null)时算折扣;未检查 DEL_STS",
+      "verdict": "different",
+      "defect_class": "logical-delete",
+      "confidence": 0.9,
+      "evidence": "AS400 分支含 DEL_STS <> 'D';Java DiscountService 无对应过滤",
+      "needs_runtime_test": true
+    },
+    {
+      "rule_id": "R002",
+      "as400_assertion": "折扣 = ORD_AMT*CUST_DISC/100,half-adjust(HALF_UP)到 2 位",
+      "java_assertion": "折扣 = ordAmt*custDisc/100,scale 2,HALF_EVEN",
+      "verdict": "different",
+      "defect_class": "packed-zoned-precision",
+      "confidence": 0.85,
+      "evidence": "AS400 half-adjust 等价 HALF_UP;Java 用 RoundingMode.HALF_EVEN,临界 0.005 类输入结果不同",
+      "needs_runtime_test": true
+    }
+  ],
+  "notes": "两条规则均不同:逻辑删除未还原 + 舍入模式不一致。pair 判 different。"
+}

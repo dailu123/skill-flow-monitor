@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/anchor-verify.schema.json",
+  "title": "Anchor Verification Report",
+  "description": "verify_semantics.py 输出:用确定性锚点给 LLM 语义产物对账的结果。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generated_at", "side", "summary", "units"],
+  "properties": {
+    "generated_at": { "type": "string" },
+    "side": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["units", "ok", "review", "suspect", "unverifiable", "hallucinated_total", "missed_total"],
+      "properties": {
+        "units": { "type": "integer", "minimum": 0 },
+        "ok": { "type": "integer", "minimum": 0 },
+        "review": { "type": "integer", "minimum": 0 },
+        "suspect": { "type": "integer", "minimum": 0 },
+        "unverifiable": { "type": "integer", "minimum": 0 },
+        "hallucinated_total": { "type": "integer", "minimum": 0 },
+        "missed_total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["unit_id", "path", "status", "authority", "hallucinated", "missed", "notes"],
+        "properties": {
+          "unit_id": { "type": "string" },
+          "path": { "type": "string" },
+          "status": { "type": "string", "enum": ["ok", "review", "suspect", "unverifiable"] },
+          "authority": { "type": "string", "enum": ["authoritative", "advisory", "none"] },
+          "hallucinated": { "$ref": "#/$defs/anchorbag" },
+          "missed": { "$ref": "#/$defs/anchorbag" },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "anchorbag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tables", "call_targets", "sql_tables"],
+      "properties": {
+        "tables": { "type": "array", "items": { "type": "string" } },
+        "call_targets": { "type": "array", "items": { "type": "string" } },
+        "sql_tables": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

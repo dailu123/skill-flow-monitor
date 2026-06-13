@@ -1,0 +1,3 @@
+unit_id,side,path,risk,est_tokens,prompt,status,artifact
+JAV-0001-CustomerSearch,java,samples/java/CustomerSearch.java,low,900,/extract-semantics,todo,analysis/semantics/JAV-0001-CustomerSearch.json
+JAV-0002-DiscountService,java,samples/java/DiscountService.java,low,900,/extract-semantics,todo,analysis/semantics/JAV-0002-DiscountService.json

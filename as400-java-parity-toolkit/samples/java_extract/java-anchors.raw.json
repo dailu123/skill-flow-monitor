@@ -1,0 +1,32 @@
+{
+  "tool": "java-extractor",
+  "version": "1.0",
+  "source_root": "samples/java",
+  "_note": "这是 java-extractor 对 samples/java 应产出的中间 JSON 样例(手写,便于无 JVM 时验证 Python 链路)。",
+  "units": [
+    {
+      "path": "samples/java/CustomerSearch.java",
+      "class": "com.example.customer.CustomerSearch",
+      "methods": ["search"],
+      "calls": ["custMas.findByCustNoBetween"],
+      "jpa_tables": ["CUSTMAS"],
+      "jpa_columns": [],
+      "sql_tables": ["CUSTMAS"],
+      "sql_columns": ["CUST_NO"],
+      "endpoints": [],
+      "mybatis_tables": []
+    },
+    {
+      "path": "samples/java/DiscountService.java",
+      "class": "com.example.order.DiscountService",
+      "methods": ["calcDiscount"],
+      "calls": ["custMas.findById", "ordHdr.update"],
+      "jpa_tables": ["ORDHDR", "CUSTMAS"],
+      "jpa_columns": [],
+      "sql_tables": [],
+      "sql_columns": [],
+      "endpoints": [],
+      "mybatis_tables": []
+    }
+  ]
+}

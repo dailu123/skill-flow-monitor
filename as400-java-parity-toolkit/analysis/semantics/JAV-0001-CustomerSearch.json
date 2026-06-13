@@ -1,0 +1,50 @@
+{
+  "unit_id": "JAV-0001-CustomerSearch",
+  "side": "java",
+  "path": "samples/java/CustomerSearch.java",
+  "anchors": {
+    "tables": ["CUSTMAS"],
+    "fields": ["cust_no", "cust_nm"],
+    "programs": ["CustomerSearch"],
+    "transactions": [],
+    "screens": [],
+    "call_targets": [],
+    "sql_tables": ["CUSTMAS"]
+  },
+  "inputs": [
+    { "name": "fromNo", "type": "String", "meaning": "客户编号范围下界" },
+    { "name": "toNo", "type": "String", "meaning": "客户编号范围上界" }
+  ],
+  "outputs": [
+    { "name": "result", "type": "List<Customer>", "meaning": "范围内客户列表" }
+  ],
+  "reads_writes": [
+    { "table": "CUSTMAS", "access": "read", "keys": ["cust_no"] }
+  ],
+  "rules": [
+    {
+      "rule_id": "R001",
+      "assertion": "fromNo/toNo 为 null 时取空串 \"\" 作端点,而非 *LOVAL/*HIVAL 哨兵",
+      "fields_touched": ["fromNo", "toNo"],
+      "confidence": 0.95
+    },
+    {
+      "rule_id": "R002",
+      "assertion": "CUST_NO BETWEEN from AND to,ORDER BY cust_no 走数据库默认 collation(非 EBCDIC)",
+      "fields_touched": ["cust_no"],
+      "confidence": 0.95
+    }
+  ],
+  "branches": [
+    { "condition": "fromNo == null", "outcome": "f := \"\"" },
+    { "condition": "toNo == null", "outcome": "t := \"\"" }
+  ],
+  "boundaries": [
+    "BETWEEN 闭区间含端点",
+    "排序走 DB 默认 collation,通常为 ASCII/Unicode 序"
+  ],
+  "error_paths": [],
+  "confidence": 0.93,
+  "needs_human_review": false,
+  "notes": "Java 侧语义清晰。"
+}

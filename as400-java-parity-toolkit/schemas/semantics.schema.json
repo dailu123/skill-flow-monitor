@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/semantics.schema.json",
+  "title": "Unit Semantics",
+  "description": "一个分析单元(AS400 程序/Java 类)的语义抽取结果。两侧使用同一 schema,以便对齐与对比。语义只作为锚点之外的补充,绝不用于匹配主键。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unit_id", "side", "path", "anchors", "inputs", "outputs", "reads_writes", "rules", "branches", "boundaries", "error_paths", "confidence", "needs_human_review"],
+  "properties": {
+    "unit_id": {
+      "type": "string",
+      "description": "稳定单元 ID,由 build_units.py 分配;两侧通过锚点对齐,而非靠此 ID 相等。"
+    },
+    "side": {
+      "type": "string",
+      "enum": ["as400", "java"],
+      "description": "来源侧。"
+    },
+    "path": {
+      "type": "string",
+      "description": "源文件相对路径(pathlib posix 风格)。"
+    },
+    "anchors": {
+      "type": "object",
+      "description": "确定性锚点。LLM 不得改写这里的值,只可引用。",
+      "additionalProperties": false,
+      "required": ["tables", "fields", "programs", "transactions", "screens", "call_targets", "sql_tables"],
+      "properties": {
+        "tables": { "type": "array", "items": { "type": "string" }, "description": "DB2/物理逻辑文件(表)名,最强锚点。" },
+        "fields": { "type": "array", "items": { "type": "string" }, "description": "字段名(库.表.字段 或 表.字段)。" },
+        "programs": { "type": "array", "items": { "type": "string" }, "description": "程序/子程序名。" },
+        "transactions": { "type": "array", "items": { "type": "string" }, "description": "事务码。" },
+        "screens": { "type": "array", "items": { "type": "string" }, "description": "屏幕/显示文件记录格式 ID。" },
+        "call_targets": { "type": "array", "items": { "type": "string" }, "description": "CALL/CALLP/调用目标。" },
+        "sql_tables": { "type": "array", "items": { "type": "string" }, "description": "嵌入式 SQL / OPNQRYF 涉及的表。" }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/io_field" },
+      "description": "输入参数/入口字段。"
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/io_field" },
+      "description": "输出参数/返回字段。"
+    },
+    "reads_writes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["table", "access"],
+        "properties": {
+          "table": { "type": "string" },
+          "access": { "type": "string", "enum": ["read", "write", "update", "delete"] },
+          "keys": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "description": "离散业务规则断言。粒度必须保住缺陷维度(精度/排序/null/边界等)。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "assertion", "confidence"],
+        "properties": {
+          "rule_id": { "type": "string", "description": "单元内稳定的规则 ID,如 R001。" },
+          "assertion": { "type": "string", "description": "一句可证伪的断言。" },
+          "fields_touched": { "type": "array", "items": { "type": "string" } },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "branches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condition", "outcome"],
+        "properties": {
+          "condition": { "type": "string" },
+          "outcome": { "type": "string" }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "边界处理(空集合、溢出、截断、世纪窗口等)。"
+    },
+    "error_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "错误/异常路径与处理方式。"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "本单元整体语义抽取置信度。"
+    },
+    "needs_human_review": {
+      "type": "boolean",
+      "description": "true 表示需人工复核(AS400/RPG 侧低置信度应置 true)。"
+    },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "io_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "description": "如 packed(7,2)/zoned/char(10)/date 等。" },
+        "meaning": { "type": "string" }
+      }
+    }
+  }
+}

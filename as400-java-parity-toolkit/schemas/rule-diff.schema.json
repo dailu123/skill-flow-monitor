@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/rule-diff.schema.json",
+  "title": "Rule-level Diff",
+  "description": "compare-pair 的输出。一个 mapping 内逐条规则对比。语义匹配只能产出 candidate_equivalent,绝不直接判 equivalent;最终判定来自规则级 diff + 运行时差异测试。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mapping_id", "pair_verdict", "rules"],
+  "properties": {
+    "mapping_id": { "type": "string", "description": "对应 mapping.schema.json 的 mapping_id。" },
+    "pair_verdict": {
+      "type": "string",
+      "enum": ["candidate_equivalent", "different", "uncertain"],
+      "description": "整对结论。语义一致最多到 candidate_equivalent;只有规则全 same 且无 needs_runtime_test 未决,且有运行时证据支撑,人工才可在别处升级。本字段本身绝不写 equivalent。"
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "as400_assertion", "java_assertion", "verdict", "defect_class", "confidence", "evidence", "needs_runtime_test"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "as400_assertion": { "type": "string" },
+          "java_assertion": { "type": "string", "description": "Java 侧对应断言;若缺失填空串并在 verdict 体现。" },
+          "verdict": {
+            "type": "string",
+            "enum": ["same", "different", "uncertain"],
+            "description": "single rule 判定。same 不等于 equivalent,仅表示语义层面未发现差异。"
+          },
+          "defect_class": {
+            "type": "string",
+            "description": "命中的缺陷类(见 docs/DEFECT-CLASSES.md 的 id),无则填 none。",
+            "enum": [
+              "none",
+              "ebcdic-sort",
+              "packed-zoned-precision",
+              "null-blank-empty",
+              "date-century-window",
+              "logical-delete",
+              "numeric-overflow-truncation",
+              "transaction-commit-boundary",
+              "figurative-constant",
+              "dynamic-query-condition-range",
+              "other"
+            ]
+          },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "evidence": { "type": "string", "description": "支撑判定的源码引用/锚点引用。" },
+          "needs_runtime_test": {
+            "type": "boolean",
+            "description": "true 表示该规则需运行时差异测试 oracle 才能定论。verdict=different/uncertain 或命中精度/排序/边界类缺陷时通常为 true。"
+          }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

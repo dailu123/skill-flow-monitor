@@ -1,0 +1,38 @@
+{
+  "test_id": "T-MAP-002-001",
+  "mapping_id": "MAP-002",
+  "title": "客户范围检索:EBCDIC 排序序 + 空端点哨兵 运行时对比",
+  "covers_rules": ["R001", "R002"],
+  "targets": {
+    "as400": "CUSTSRCH",
+    "java": "com.example.customer.CustomerSearch#search"
+  },
+  "inputs": [
+    {
+      "case_id": "C1-empty-range",
+      "purpose": "figurative-constant: 空 from/to(*LOVAL/*HIVAL vs 空串)",
+      "params": { "fromNo": "", "toNo": "" }
+    },
+    {
+      "case_id": "C2-mixed-keys-sort",
+      "purpose": "ebcdic-sort: 数字+字母+大小写混合键的排序序",
+      "params": { "fromNo": "        ", "toNo": "ZZZZZZZZ" },
+      "seed_data": [
+        { "CUST_NO": "0001AAAA", "CUST_NM": "num-first" },
+        { "CUST_NO": "A0001AAA", "CUST_NM": "letter-first" },
+        { "CUST_NO": "a0001AAA", "CUST_NM": "lower-letter" }
+      ]
+    }
+  ],
+  "compare": {
+    "outputs": ["result[].CUST_NO", "result[].CUST_NM", "result.length"],
+    "data_scan": [
+      { "table": "CUSTMAS", "columns": ["CUST_NO"], "where": "1=1" }
+    ],
+    "tolerance": {
+      "result_order": "0"
+    }
+  },
+  "expected_source": "as400_is_oracle",
+  "notes": "C2 用于戳穿 EBCDIC 排序与 DB collation 的顺序差异;result_order 容差为 0(顺序必须完全一致)。"
+}

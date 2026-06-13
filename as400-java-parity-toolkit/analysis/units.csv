@@ -1,0 +1,5 @@
+side,unit_id,path,risk,est_tokens,prompt
+as400,AS4-0001-CALCDISC,samples/as400/CALCDISC.sqlrpgle,low,1300,/extract-semantics
+as400,AS4-0002-CUSTSRCH,samples/as400/CUSTSRCH.sqlrpgle,low,980,/extract-semantics
+java,JAV-0001-CustomerSearch,samples/java/CustomerSearch.java,low,900,/extract-semantics
+java,JAV-0002-DiscountService,samples/java/DiscountService.java,low,900,/extract-semantics

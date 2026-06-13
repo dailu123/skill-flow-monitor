@@ -1,0 +1,15 @@
+{
+  "mapping_id": "MAP-001",
+  "bucket": "matched",
+  "as400_units": ["AS4-0001-CALCDISC"],
+  "java_units": ["JAV-0002-DiscountService"],
+  "business_function": "订单折扣计算",
+  "anchor_evidence": [
+    { "kind": "table", "value": "ORDHDR" },
+    { "kind": "table", "value": "CUSTMAS" },
+    { "kind": "field", "value": "DISC_AMT" }
+  ],
+  "confidence": 0.92,
+  "needs_human_review": false,
+  "notes": "共享 ORDHDR/CUSTMAS 表与 DISC_AMT 字段,锚点强匹配。"
+}

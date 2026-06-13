@@ -1,0 +1,53 @@
+{
+  "unit_id": "AS4-0001-CALCDISC",
+  "side": "as400",
+  "path": "samples/as400/CALCDISC.sqlrpgle",
+  "anchors": {
+    "tables": ["ORDHDR", "CUSTMAS"],
+    "fields": ["ORD_AMT", "DISC_PCT", "DISC_AMT", "DEL_STS", "CUST_DISC"],
+    "programs": ["CALCDISC"],
+    "transactions": [],
+    "screens": [],
+    "call_targets": [],
+    "sql_tables": []
+  },
+  "inputs": [
+    { "name": "custNo", "type": "char(8)", "meaning": "客户编号" },
+    { "name": "ORD_AMT", "type": "packed(9,2)", "meaning": "订单金额" }
+  ],
+  "outputs": [
+    { "name": "DISC_AMT", "type": "packed(9,2)", "meaning": "折扣金额,写回 ORDHDR" }
+  ],
+  "reads_writes": [
+    { "table": "CUSTMAS", "access": "read", "keys": ["custNo"] },
+    { "table": "ORDHDR", "access": "update", "keys": ["custNo"] }
+  ],
+  "rules": [
+    {
+      "rule_id": "R001",
+      "assertion": "仅当客户存在且 DEL_STS <> 'D'(未逻辑删除)时才计算并写回折扣",
+      "fields_touched": ["DEL_STS"],
+      "confidence": 0.9
+    },
+    {
+      "rule_id": "R002",
+      "assertion": "折扣金额 = ORD_AMT * CUST_DISC / 100,half-adjust 四舍五入到 2 位小数(packed 9,2)",
+      "fields_touched": ["ORD_AMT", "CUST_DISC", "DISC_AMT"],
+      "confidence": 0.75
+    }
+  ],
+  "branches": [
+    { "condition": "%found(CUSTMAS) and DEL_STS <> 'D'", "outcome": "计算并 update ORDHDR" },
+    { "condition": "未找到或 DEL_STS = 'D'", "outcome": "不处理,直接 return" }
+  ],
+  "boundaries": [
+    "DISC_AMT 为 packed(9,2),金额过大可能超字段位宽(未在源码显式处理)",
+    "舍入采用 RPG half-adjust(等价 HALF_UP)"
+  ],
+  "error_paths": [
+    "客户不存在时静默返回,不报错"
+  ],
+  "confidence": 0.78,
+  "needs_human_review": true,
+  "notes": "RPG packed 精度与 half-adjust 语义为 LLM 弱项,已标记人工复核。"
+}

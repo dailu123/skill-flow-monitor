@@ -1,0 +1,53 @@
+{
+  "unit_id": "JAV-0002-DiscountService",
+  "side": "java",
+  "path": "samples/java/DiscountService.java",
+  "anchors": {
+    "tables": ["ORDHDR", "CUSTMAS"],
+    "fields": ["ordAmt", "custDisc", "discAmt"],
+    "programs": ["DiscountService"],
+    "transactions": [],
+    "screens": [],
+    "call_targets": [],
+    "sql_tables": []
+  },
+  "inputs": [
+    { "name": "custNo", "type": "String", "meaning": "客户编号" },
+    { "name": "ord.ordAmt", "type": "BigDecimal", "meaning": "订单金额" }
+  ],
+  "outputs": [
+    { "name": "ord.discAmt", "type": "BigDecimal", "meaning": "折扣金额,写回 ORDHDR" }
+  ],
+  "reads_writes": [
+    { "table": "CUSTMAS", "access": "read", "keys": ["custNo"] },
+    { "table": "ORDHDR", "access": "update", "keys": ["custNo"] }
+  ],
+  "rules": [
+    {
+      "rule_id": "R001",
+      "assertion": "仅当客户存在(c != null)时计算并写回折扣;未检查逻辑删除标记 DEL_STS",
+      "fields_touched": [],
+      "confidence": 0.95
+    },
+    {
+      "rule_id": "R002",
+      "assertion": "折扣金额 = ordAmt * custDisc / 100,scale=2,RoundingMode.HALF_EVEN",
+      "fields_touched": ["ordAmt", "custDisc", "discAmt"],
+      "confidence": 0.95
+    }
+  ],
+  "branches": [
+    { "condition": "c != null", "outcome": "计算并 update ORDHDR" },
+    { "condition": "c == null", "outcome": "不处理" }
+  ],
+  "boundaries": [
+    "BigDecimal 不溢出,scale 固定为 2",
+    "舍入采用 HALF_EVEN(银行家舍入)"
+  ],
+  "error_paths": [
+    "客户不存在时静默返回"
+  ],
+  "confidence": 0.93,
+  "needs_human_review": false,
+  "notes": "Java 侧语义清晰,置信度高。"
+}

@@ -1,0 +1,3 @@
+mapping_id,test_id,case_id,field,as400_value,java_value,equal
+MAP-002,T-MAP-002-001,C2-mixed-keys-sort,result_order,"0001AAAA,A0001AAA,a0001AAA","A0001AAA,a0001AAA,0001AAAA",0
+MAP-002,T-MAP-002-001,C1-empty-range,result.length,3,3,1

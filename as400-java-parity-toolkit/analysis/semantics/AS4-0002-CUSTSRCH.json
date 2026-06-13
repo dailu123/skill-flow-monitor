@@ -1,0 +1,51 @@
+{
+  "unit_id": "AS4-0002-CUSTSRCH",
+  "side": "as400",
+  "path": "samples/as400/CUSTSRCH.sqlrpgle",
+  "anchors": {
+    "tables": ["CUSTMAS"],
+    "fields": ["CUST_NO", "CUST_NM"],
+    "programs": ["CUSTSRCH"],
+    "transactions": [],
+    "screens": [],
+    "call_targets": [],
+    "sql_tables": ["CUSTMAS"]
+  },
+  "inputs": [
+    { "name": "fromNo", "type": "char(8)", "meaning": "客户编号范围下界" },
+    { "name": "toNo", "type": "char(8)", "meaning": "客户编号范围上界" }
+  ],
+  "outputs": [
+    { "name": "result", "type": "cursor(CUST_NO,CUST_NM)", "meaning": "范围内客户列表" }
+  ],
+  "reads_writes": [
+    { "table": "CUSTMAS", "access": "read", "keys": ["CUST_NO"] }
+  ],
+  "rules": [
+    {
+      "rule_id": "R001",
+      "assertion": "fromNo 为空白时取 *LOVAL 作下界,toNo 为空白时取 *HIVAL 作上界(空条件=全表范围)",
+      "fields_touched": ["fromNo", "toNo"],
+      "confidence": 0.85
+    },
+    {
+      "rule_id": "R002",
+      "assertion": "按 CUST_NO BETWEEN from AND to 闭区间检索,结果按 CUST_NO 的 EBCDIC 排序序返回",
+      "fields_touched": ["CUST_NO"],
+      "confidence": 0.8
+    }
+  ],
+  "branches": [
+    { "condition": "fromNo = *BLANKS", "outcome": "fromNo := *LOVAL" },
+    { "condition": "toNo = *BLANKS", "outcome": "toNo := *HIVAL" }
+  ],
+  "boundaries": [
+    "闭区间含端点",
+    "排序为 EBCDIC 序(数字在字母之后、小写在大写之前)",
+    "figurative constant *LOVAL/*HIVAL 作范围哨兵"
+  ],
+  "error_paths": [],
+  "confidence": 0.8,
+  "needs_human_review": true,
+  "notes": "figurative constant 与 EBCDIC 排序为 LLM 弱项,已标记复核。"
+}

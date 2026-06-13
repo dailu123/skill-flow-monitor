@@ -1,0 +1,15 @@
+{
+  "mapping_id": "MAP-002",
+  "bucket": "matched",
+  "as400_units": ["AS4-0002-CUSTSRCH"],
+  "java_units": ["JAV-0001-CustomerSearch"],
+  "business_function": "客户编号范围检索",
+  "anchor_evidence": [
+    { "kind": "table", "value": "CUSTMAS" },
+    { "kind": "field", "value": "CUST_NO" },
+    { "kind": "sql_table", "value": "CUSTMAS" }
+  ],
+  "confidence": 0.9,
+  "needs_human_review": false,
+  "notes": "共享 CUSTMAS 表与 CUST_NO 键,锚点强匹配。"
+}

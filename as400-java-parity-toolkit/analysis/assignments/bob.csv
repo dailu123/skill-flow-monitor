@@ -1,0 +1,2 @@
+unit_id,side,path,risk,est_tokens,prompt,status,artifact
+AS4-0002-CUSTSRCH,as400,samples/as400/CUSTSRCH.sqlrpgle,low,980,/extract-semantics,todo,analysis/semantics/AS4-0002-CUSTSRCH.json

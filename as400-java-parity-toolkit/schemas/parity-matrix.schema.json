@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/parity-matrix.schema.json",
+  "title": "Parity Matrix",
+  "description": "aggregate_matrix.py 的汇总输出:业务功能 × 验证状态 × 风险 × 覆盖率,加单侧桶计数与分类风险点 N/M。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generated_at", "buckets", "functions", "defect_class_rollup", "totals"],
+  "properties": {
+    "generated_at": { "type": "string", "description": "ISO8601 生成时间。" },
+    "buckets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matched", "as400_only", "java_only"],
+      "properties": {
+        "matched": { "type": "integer", "minimum": 0 },
+        "as400_only": { "type": "integer", "minimum": 0, "description": "Java 功能缺失,高优先级。" },
+        "java_only": { "type": "integer", "minimum": 0, "description": "Java 新增,高优先级。" }
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["business_function", "verification_status", "risk", "coverage"],
+        "properties": {
+          "business_function": { "type": "string" },
+          "verification_status": {
+            "type": "string",
+            "enum": ["candidate_equivalent", "different", "uncertain", "unmapped", "not_compared"]
+          },
+          "risk": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rules_total", "rules_runtime_verified"],
+            "properties": {
+              "rules_total": { "type": "integer", "minimum": 0 },
+              "rules_runtime_verified": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "open_defect_classes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "defect_class_rollup": {
+      "type": "array",
+      "description": "每个缺陷类:分类风险点 N(命中数)/ 已验 M(运行时已验证数)。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["defect_class", "risk_points", "verified"],
+        "properties": {
+          "defect_class": { "type": "string" },
+          "risk_points": { "type": "integer", "minimum": 0, "description": "N:命中该缺陷类的规则数。" },
+          "verified": { "type": "integer", "minimum": 0, "description": "M:其中已有运行时差异测试结论的数。" }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mappings", "rules", "rules_needing_runtime", "rules_runtime_verified"],
+      "properties": {
+        "mappings": { "type": "integer", "minimum": 0 },
+        "rules": { "type": "integer", "minimum": 0 },
+        "rules_needing_runtime": { "type": "integer", "minimum": 0 },
+        "rules_runtime_verified": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

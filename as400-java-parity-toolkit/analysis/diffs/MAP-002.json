@@ -1,0 +1,27 @@
+{
+  "mapping_id": "MAP-002",
+  "pair_verdict": "candidate_equivalent",
+  "rules": [
+    {
+      "rule_id": "R001",
+      "as400_assertion": "空白端点取 *LOVAL/*HIVAL 哨兵(空条件=全表范围)",
+      "java_assertion": "null 端点取空串 \"\";语义上也表示开放端点",
+      "verdict": "same",
+      "defect_class": "figurative-constant",
+      "confidence": 0.55,
+      "evidence": "语义层看似都表示'开放端点',但 *HIVAL 与空串在 BETWEEN 上界语义不同,存疑",
+      "needs_runtime_test": true
+    },
+    {
+      "rule_id": "R002",
+      "as400_assertion": "结果按 CUST_NO EBCDIC 排序序返回,BETWEEN 闭区间",
+      "java_assertion": "ORDER BY cust_no 走 DB 默认 collation,BETWEEN 闭区间",
+      "verdict": "same",
+      "defect_class": "ebcdic-sort",
+      "confidence": 0.5,
+      "evidence": "两侧都是 BETWEEN+ORDER BY,语义层'看起来一样';但排序序 EBCDIC vs collation 可能不同,需运行时验证",
+      "needs_runtime_test": true
+    }
+  ],
+  "notes": "语义层未发现显式差异 -> 最多 candidate_equivalent,绝不判 equivalent。两条都 needs_runtime_test=true;运行时证据将戳穿 EBCDIC 排序差异。"
+}

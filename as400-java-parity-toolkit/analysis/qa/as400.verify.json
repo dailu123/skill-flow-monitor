@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-06-13T15:02:21.545764+00:00",
+  "side": "as400",
+  "summary": {
+    "units": 2,
+    "ok": 2,
+    "review": 0,
+    "suspect": 0,
+    "unverifiable": 0,
+    "hallucinated_total": 0,
+    "missed_total": 0
+  },
+  "units": [
+    {
+      "unit_id": "AS4-0001-CALCDISC",
+      "path": "samples/as400/CALCDISC.sqlrpgle",
+      "status": "ok",
+      "authority": "authoritative",
+      "hallucinated": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "missed": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "notes": "锚点与确定性来源一致。"
+    },
+    {
+      "unit_id": "AS4-0002-CUSTSRCH",
+      "path": "samples/as400/CUSTSRCH.sqlrpgle",
+      "status": "ok",
+      "authority": "authoritative",
+      "hallucinated": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "missed": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "notes": "锚点与确定性来源一致。"
+    }
+  ]
+}

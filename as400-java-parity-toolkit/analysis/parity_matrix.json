@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-06-13T15:02:40.893647+00:00",
+  "buckets": {
+    "matched": 2,
+    "as400_only": 0,
+    "java_only": 0
+  },
+  "functions": [
+    {
+      "business_function": "订单折扣计算",
+      "verification_status": "different",
+      "risk": "critical",
+      "coverage": {
+        "rules_total": 2,
+        "rules_runtime_verified": 0
+      },
+      "open_defect_classes": [
+        "logical-delete",
+        "packed-zoned-precision"
+      ]
+    },
+    {
+      "business_function": "客户编号范围检索",
+      "verification_status": "candidate_equivalent",
+      "risk": "low",
+      "coverage": {
+        "rules_total": 2,
+        "rules_runtime_verified": 2
+      },
+      "open_defect_classes": []
+    }
+  ],
+  "defect_class_rollup": [
+    {
+      "defect_class": "logical-delete",
+      "risk_points": 1,
+      "verified": 0
+    },
+    {
+      "defect_class": "packed-zoned-precision",
+      "risk_points": 1,
+      "verified": 0
+    },
+    {
+      "defect_class": "figurative-constant",
+      "risk_points": 1,
+      "verified": 1
+    },
+    {
+      "defect_class": "ebcdic-sort",
+      "risk_points": 1,
+      "verified": 1
+    }
+  ],
+  "totals": {
+    "mappings": 2,
+    "rules": 4,
+    "rules_needing_runtime": 4,
+    "rules_runtime_verified": 2
+  }
+}

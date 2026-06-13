@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/index.schema.json",
+  "title": "Code Map Index",
+  "description": "build_index.py 输出:某一侧的反向索引(代码地图)。用于'递推索引 -> 下钻代码'。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["side", "generated_at", "unit_count", "by_table", "by_field", "by_call", "call_graph", "units"],
+  "properties": {
+    "side": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "unit_count": { "type": "integer", "minimum": 0 },
+    "by_table": {
+      "type": "object",
+      "description": "表名 -> 引用它的 unit_id 列表。",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "by_field": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "by_call": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "call_graph": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_unit", "to"],
+        "properties": {
+          "from_unit": { "type": "string" },
+          "to": { "type": "string" }
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["unit_id", "path", "tables", "programs", "confidence", "needs_human_review"],
+        "properties": {
+          "unit_id": { "type": "string" },
+          "path": { "type": "string" },
+          "tables": { "type": "array", "items": { "type": "string" } },
+          "programs": { "type": "array", "items": { "type": "string" } },
+          "confidence": { "type": "number" },
+          "needs_human_review": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+unit_id,side,path,risk,est_tokens,prompt,status,artifact
+AS4-0001-CALCDISC,as400,samples/as400/CALCDISC.sqlrpgle,critical,1300,/extract-semantics,todo,analysis/semantics/AS4-0001-CALCDISC.json
+JAV-0002-DiscountService,java,samples/java/DiscountService.java,critical,1300,/extract-semantics,todo,analysis/semantics/JAV-0002-DiscountService.json
+AS4-0002-CUSTSRCH,as400,samples/as400/CUSTSRCH.sqlrpgle,high,1100,/extract-semantics,todo,analysis/semantics/AS4-0002-CUSTSRCH.json
+JAV-0001-CustomerSearch,java,samples/java/CustomerSearch.java,high,1100,/extract-semantics,todo,analysis/semantics/JAV-0001-CustomerSearch.json

@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-06-13T15:02:21.546859+00:00",
+  "side": "java",
+  "summary": {
+    "units": 2,
+    "ok": 0,
+    "review": 2,
+    "suspect": 0,
+    "unverifiable": 0,
+    "hallucinated_total": 0,
+    "missed_total": 3
+  },
+  "units": [
+    {
+      "unit_id": "JAV-0001-CustomerSearch",
+      "path": "samples/java/CustomerSearch.java",
+      "status": "review",
+      "authority": "authoritative",
+      "hallucinated": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "missed": {
+        "tables": [],
+        "call_targets": [
+          "CUSTMAS.FINDBYCUSTNOBETWEEN"
+        ],
+        "sql_tables": []
+      },
+      "notes": "确定性来源中存在但 LLM 漏抽的锚点(召回不足)。"
+    },
+    {
+      "unit_id": "JAV-0002-DiscountService",
+      "path": "samples/java/DiscountService.java",
+      "status": "review",
+      "authority": "authoritative",
+      "hallucinated": {
+        "tables": [],
+        "call_targets": [],
+        "sql_tables": []
+      },
+      "missed": {
+        "tables": [],
+        "call_targets": [
+          "CUSTMAS.FINDBYID",
+          "ORDHDR.UPDATE"
+        ],
+        "sql_tables": []
+      },
+      "notes": "确定性来源中存在但 LLM 漏抽的锚点(召回不足)。"
+    }
+  ]
+}

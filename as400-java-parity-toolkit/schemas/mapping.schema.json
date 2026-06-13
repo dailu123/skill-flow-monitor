@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parity-toolkit/schemas/mapping.schema.json",
+  "title": "Alignment Mapping",
+  "description": "AS400 单元与 Java 单元之间的对齐结果。允许 N:M。单侧桶(as400_only/java_only)是功能缺失/新增的高优先级证据。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mapping_id", "bucket", "as400_units", "java_units", "anchor_evidence", "confidence"],
+  "properties": {
+    "mapping_id": { "type": "string" },
+    "bucket": {
+      "type": "string",
+      "enum": ["matched", "as400_only", "java_only"],
+      "description": "matched=双侧匹配;as400_only=Java 缺失;java_only=Java 新增。孤心单侧优先复核。"
+    },
+    "as400_units": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "AS400 侧 unit_id 列表(N:M 中的 N)。"
+    },
+    "java_units": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Java 侧 unit_id 列表(N:M 中的 M)。"
+    },
+    "business_function": {
+      "type": "string",
+      "description": "对齐到的业务功能名,用于矩阵聚合。"
+    },
+    "anchor_evidence": {
+      "type": "array",
+      "description": "支撑对齐的共享锚点(表/字段/事务码/调用目标)。语义相似不可作为唯一证据。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["table", "field", "program", "transaction", "screen", "call_target", "sql_table"] },
+          "value": { "type": "string" }
+        }
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "needs_human_review": { "type": "boolean" },
+    "notes": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "bucket": { "const": "matched" } } },
+      "then": { "properties": { "as400_units": { "minItems": 1 }, "java_units": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "bucket": { "const": "as400_only" } } },
+      "then": { "properties": { "as400_units": { "minItems": 1 }, "java_units": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "bucket": { "const": "java_only" } } },
+      "then": { "properties": { "java_units": { "minItems": 1 }, "as400_units": { "maxItems": 0 } } }
+    }
+  ]
+}

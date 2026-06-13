@@ -1,0 +1,36 @@
+{
+  "total_rows": 2,
+  "mappings_with_runtime_evidence": 1,
+  "by_mapping": [
+    {
+      "mapping_id": "MAP-002",
+      "cases": 2,
+      "mismatches": 1,
+      "fields": [
+        "result_order"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "mapping_id": "MAP-002",
+      "test_id": "T-MAP-002-001",
+      "case_id": "C2-mixed-keys-sort",
+      "field": "result_order",
+      "as400_value": "0001AAAA,A0001AAA,a0001AAA",
+      "java_value": "A0001AAA,a0001AAA,0001AAAA",
+      "equal": false,
+      "source": "CUSTSRCH_runtime.csv"
+    },
+    {
+      "mapping_id": "MAP-002",
+      "test_id": "T-MAP-002-001",
+      "case_id": "C1-empty-range",
+      "field": "result.length",
+      "as400_value": "3",
+      "java_value": "3",
+      "equal": true,
+      "source": "CUSTSRCH_runtime.csv"
+    }
+  ]
+}

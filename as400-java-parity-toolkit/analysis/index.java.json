@@ -1,0 +1,60 @@
+{
+  "by_table": {
+    "CUSTMAS": [
+      "JAV-0001-CustomerSearch",
+      "JAV-0002-DiscountService"
+    ],
+    "ORDHDR": [
+      "JAV-0002-DiscountService"
+    ]
+  },
+  "by_field": {
+    "custDisc": [
+      "JAV-0002-DiscountService"
+    ],
+    "cust_nm": [
+      "JAV-0001-CustomerSearch"
+    ],
+    "cust_no": [
+      "JAV-0001-CustomerSearch"
+    ],
+    "discAmt": [
+      "JAV-0002-DiscountService"
+    ],
+    "ordAmt": [
+      "JAV-0002-DiscountService"
+    ]
+  },
+  "by_call": {},
+  "call_graph": [],
+  "units": [
+    {
+      "unit_id": "JAV-0001-CustomerSearch",
+      "path": "samples/java/CustomerSearch.java",
+      "tables": [
+        "CUSTMAS"
+      ],
+      "programs": [
+        "CustomerSearch"
+      ],
+      "confidence": 0.93,
+      "needs_human_review": false
+    },
+    {
+      "unit_id": "JAV-0002-DiscountService",
+      "path": "samples/java/DiscountService.java",
+      "tables": [
+        "CUSTMAS",
+        "ORDHDR"
+      ],
+      "programs": [
+        "DiscountService"
+      ],
+      "confidence": 0.93,
+      "needs_human_review": false
+    }
+  ],
+  "side": "java",
+  "generated_at": "2026-06-13T15:02:21.629310+00:00",
+  "unit_count": 2
+}

@@ -1,0 +1,4 @@
+program,referenced_object,object_type
+CALCDISC,ORDHDR,FILE
+CALCDISC,CUSTMAS,FILE
+CUSTSRCH,CUSTMAS,FILE

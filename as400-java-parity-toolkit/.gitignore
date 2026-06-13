@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 大体积中间产物(锚点原始 dump、运行时原始 dump)——忽略,但保留 analysis/ 下的 JSON 结论
+analysis/anchors.*.json
+/runtime_dumps/
+*.tmp
+
+# Java 抽取器构建产物(保留源码,忽略编译输出)
+java-extractor/target/
+java-extractor/out/*.json
+
+# 但务必保留这些结论性产物(显式反忽略)
+!analysis/semantics/
+!analysis/mapping/
+!analysis/diffs/
+!analysis/tests/
+!analysis/assignments/
+!analysis/parity_matrix.json
+!analysis/runtime_diffs.json
+!analysis/PROGRESS.md
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

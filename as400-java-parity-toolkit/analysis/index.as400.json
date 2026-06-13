@@ -1,0 +1,66 @@
+{
+  "by_table": {
+    "CUSTMAS": [
+      "AS4-0001-CALCDISC",
+      "AS4-0002-CUSTSRCH"
+    ],
+    "ORDHDR": [
+      "AS4-0001-CALCDISC"
+    ]
+  },
+  "by_field": {
+    "CUST_DISC": [
+      "AS4-0001-CALCDISC"
+    ],
+    "CUST_NM": [
+      "AS4-0002-CUSTSRCH"
+    ],
+    "CUST_NO": [
+      "AS4-0002-CUSTSRCH"
+    ],
+    "DEL_STS": [
+      "AS4-0001-CALCDISC"
+    ],
+    "DISC_AMT": [
+      "AS4-0001-CALCDISC"
+    ],
+    "DISC_PCT": [
+      "AS4-0001-CALCDISC"
+    ],
+    "ORD_AMT": [
+      "AS4-0001-CALCDISC"
+    ]
+  },
+  "by_call": {},
+  "call_graph": [],
+  "units": [
+    {
+      "unit_id": "AS4-0001-CALCDISC",
+      "path": "samples/as400/CALCDISC.sqlrpgle",
+      "tables": [
+        "CUSTMAS",
+        "ORDHDR"
+      ],
+      "programs": [
+        "CALCDISC"
+      ],
+      "confidence": 0.78,
+      "needs_human_review": true
+    },
+    {
+      "unit_id": "AS4-0002-CUSTSRCH",
+      "path": "samples/as400/CUSTSRCH.sqlrpgle",
+      "tables": [
+        "CUSTMAS"
+      ],
+      "programs": [
+        "CUSTSRCH"
+      ],
+      "confidence": 0.8,
+      "needs_human_review": true
+    }
+  ],
+  "side": "as400",
+  "generated_at": "2026-06-13T15:02:21.628107+00:00",
+  "unit_count": 2
+}
