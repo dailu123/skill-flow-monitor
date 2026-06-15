@@ -14,11 +14,18 @@
   --preset    java | as400 | all（决定统计哪些扩展名），或用 --exts 自定义
   --exts      逗号分隔扩展名，覆盖 preset
   --min       目录少于多少文件就【归并进父目录单元】（默认 3）。任何文件都不会被丢弃。
-  --chunk     单目录超过多少文件就拆块（默认 50）
+  --chunk     块大小（默认 50）：大目录按此拆块；多个小目录拼到约这么多文件算一块
+  --no-pack   关闭小目录拼块，回到“每个目录一个单元”
+  --no-code-first  关闭代码优先排序，PROGRESS 按目录大小排（默认代码单元排最前先处理）
   --top       MAP.md 里目录排行显示多少行（默认 80）
-  --include-tests  测试目录也纳入分析（默认 SKIP）
-  --no-sniff       关闭 sql/xml 内容嗅探（预分类用）
+  --include-tests  测试目录也纳入分析（仅 --smart 下生效；默认无脑模式本就全收）
+  --no-sniff       关闭 sql/xml 内容嗅探（仅 --smart 下生效）
   --no-scan        关闭 LOC/符号扫描（地图会退化成只有文件数，不建议关）
+  --all-files      忽略扩展名白名单，收录所有文件（除二进制）。真正的全覆盖
+  --smart          启用预分类（SKIP 测试/生成物、合并迁移链）。默认关闭=无脑全覆盖
+
+默认（无脑全覆盖）：所有命中文件都进队列、每个单元都是 TODO 逐文件分析，没有任何
+SKIP / 合并指令。要恢复旧的智能预分类加 --smart；要连扩展名都不挑加 --all-files。
 
 产物：
   MAP.md       目录地图：文件数 + 真实代码行数 + 类/端点/表 符号统计
@@ -46,11 +53,18 @@ PRUNE_DIRS = {
     ".mypy_cache", ".pytest_cache", "site-packages", "bin", "obj", ".gradle",
 }
 
+# --all-files 模式下仍跳过的二进制：覆盖“所有代码”，不覆盖编译产物/媒体。
+BINARY_EXT = {
+    "jar", "war", "ear", "class", "zip", "gz", "tar", "7z", "rar",
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "pdf", "mp4", "mp3",
+    "exe", "dll", "so", "o", "a", "lib", "bin", "dat", "ttf", "woff", "woff2",
+}
+
 ENTRY_NAMES = {"__main__.py", "manage.py", "pom.xml", "build.gradle", "settings.gradle"}
 ENTRY_STEMS = {"main", "app", "index", "cli", "server", "application"}
 
 
-def collect(root, exts):
+def collect(root, exts, all_files=False):
     src, entries = [], []
     root = os.path.abspath(root)
     visited = set()  # 防 Windows junction / 符号链接造成的死循环
@@ -65,7 +79,11 @@ def collect(root, exts):
         for fn in filenames:
             ext = fn.rsplit(".", 1)[-1].lower() if "." in fn else ""
             rel = os.path.relpath(os.path.join(dirpath, fn), root).replace("\\", "/")
-            if ext in exts:
+            # all_files：扩展名白名单失效，除明显二进制外全部收录（真正的全覆盖）
+            if all_files:
+                if ext not in BINARY_EXT:
+                    src.append(rel)
+            elif ext in exts:
                 src.append(rel)
             stem = fn.rsplit(".", 1)[0].lower()
             if fn.lower() in ENTRY_NAMES or stem in ENTRY_STEMS:
@@ -89,6 +107,13 @@ XML_EXT = {"xml"}
 RPG_EXT = {"rpg", "rpgle", "sqlrpgle", "rpg38", "rpglemod", "clp", "clle", "cl",
            "cbl", "cob", "cblle", "mbr", "src"}
 DDS_EXT = {"dds", "pf", "lf", "dspf", "prtf"}
+
+# 程序逻辑类扩展名：PROGRESS 队列里这些单元优先排到前面先处理（配置/数据/标记类靠后）。
+# mca 看 java，hub 看 rpg/cbl；xml/sql/dds 等数据定义不计入。
+CODE_EXT = JAVA_EXT | RPG_EXT | {
+    "jsp", "py", "go", "ts", "tsx", "js", "jsx", "rb", "rs",
+    "cpp", "cc", "c", "h", "hpp", "scala", "php", "cs",
+}
 
 RE_JAVA_TYPE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
 RE_JAVA_IMPORT = re.compile(r"^import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
@@ -278,34 +303,84 @@ def write_map(ws, name, root, src, entries, by_dir, merged, loc_by_dir, sym_cnt,
         f.write("\n".join(f"{d}\t->\t{t}" for d, t in merged) + "\n" if merged else "")
 
 
-def write_progress(ws, name, root, units, by_dir, chunk, include_tests, do_sniff):
+def write_progress(ws, name, root, units, by_dir, chunk, include_tests, do_sniff, smart, pack, code_first):
     dirs = sorted(units.items(), key=lambda x: -len(x[1]))
     chunks_dir = os.path.join(ws, "chunks")
-    rows, uid = [], 0
+    plan = []  # (label, files, status, note, write_list)：先攒齐再统一排序、分配 Uxxx
     stats = Counter()
 
-    def add_chunk(part):
-        lst = f"chunks/U{uid:03d}.txt"
-        os.makedirs(chunks_dir, exist_ok=True)
-        with open(os.path.join(ws, lst.replace("/", os.sep)), "w", encoding="utf-8") as cf:
-            cf.write("\n".join(part) + "\n")
-        return lst
+    def emit(label, fs, status, note, write_list):
+        plan.append((label, fs, status, note, write_list))
 
+    def common_dir(ds):
+        common = []
+        for seg in zip(*[d.split("/") for d in ds]):
+            if len(set(seg)) == 1:
+                common.append(seg[0])
+            else:
+                break
+        return "/".join(common) or "."
+
+    def pack_label(ds):
+        return ds[0] if len(ds) == 1 else f"{len(ds)} 个小目录 @ {common_dir(ds)}/"
+
+    pack_pool = []  # 待拼装的小目录（纯 TODO、无特殊语义），稍后凑成 ~chunk 大小的合并块
     for d, fs in dirs:
-        status, merge, note = classify_unit(os.path.abspath(root), d, fs, include_tests, do_sniff)
-        stats["跳过" if status == "SKIP" else ("合并" if merge else ("指令" if note else "常规"))] += 1
-        has_merged_files = set(fs) != set(by_dir.get(d, []))  # 归并来的文件必须给清单
-        if status == "SKIP" or merge or len(fs) <= chunk:
-            uid += 1
-            need_list = (merge and len(fs) > chunk) or (has_merged_files and status != "SKIP")
-            rows.append((f"U{uid:03d}", d, len(fs), status, add_chunk(fs) if need_list else "", note))
+        if smart:
+            status, merge, note = classify_unit(os.path.abspath(root), d, fs, include_tests, do_sniff)
         else:
+            status, merge, note = "TODO", False, ""  # 无脑全覆盖：每个单元都逐文件排队
+        stat = "跳过" if status == "SKIP" else ("合并" if merge else ("指令" if note else "常规"))
+        has_merged_files = set(fs) != set(by_dir.get(d, []))  # 归并来的文件必须给清单
+        special = status == "SKIP" or merge or note  # 有特殊语义的单元不参与拼装
+
+        if special:
+            stats[stat] += 1
+            need_list = (merge and len(fs) > chunk) or (has_merged_files and status != "SKIP")
+            emit(d, fs, status, note, need_list)
+        elif len(fs) > chunk:
+            stats[stat] += 1
             n_parts = math.ceil(len(fs) / chunk)
             for k in range(n_parts):
-                uid += 1
                 part = fs[k * chunk:(k + 1) * chunk]
-                rows.append((f"U{uid:03d}", f"{d} [块{k + 1}/{n_parts}]", len(part), status,
-                             add_chunk(part), note))
+                emit(f"{d} [块{k + 1}/{n_parts}]", part, status, note, True)
+        elif pack:
+            pack_pool.append((d, fs))  # 攒起来稍后按路径顺序拼成合并块
+        else:
+            stats[stat] += 1
+            emit(d, fs, status, note, has_merged_files)
+
+    # 不足 chunk 的小目录：按路径顺序贪心拼成 ~chunk 大小的块，整目录不拆散
+    if pack_pool:
+        pack_pool.sort(key=lambda x: x[0])
+        bin_dirs, bin_files = [], []
+        for d, fs in pack_pool:
+            if bin_files and len(bin_files) + len(fs) > chunk:
+                stats["拼块"] += 1
+                emit(pack_label(bin_dirs), bin_files, "TODO", "", True)
+                bin_dirs, bin_files = [], []
+            bin_dirs.append(d)
+            bin_files.extend(fs)
+        if bin_files:
+            stats["拼块"] += 1
+            emit(pack_label(bin_dirs), bin_files, "TODO", "", True)
+
+    # 代码优先：含程序逻辑多的单元排到队首先处理；SKIP 永远垫底。稳定排序保留块/路径次序。
+    if code_first:
+        def code_n(fs):
+            return sum(1 for f in fs if ext_of(f) in CODE_EXT)
+        plan.sort(key=lambda u: (u[2] == "SKIP", -code_n(u[1]), -len(u[1])))
+
+    # 按最终顺序分配 Uxxx，落地 chunk 文件与表格行（id 与行号始终一致）
+    rows = []
+    for uid, (label, fs, status, note, write_list) in enumerate(plan, 1):
+        lst = ""
+        if write_list:
+            lst = f"chunks/U{uid:03d}.txt"
+            os.makedirs(chunks_dir, exist_ok=True)
+            with open(os.path.join(ws, lst.replace("/", os.sep)), "w", encoding="utf-8") as cf:
+                cf.write("\n".join(fs) + "\n")
+        rows.append((f"U{uid:03d}", label, len(fs), status, lst, note))
 
     lines = [
         f"# 分析进度与任务队列（PROGRESS）— {name}\n",
@@ -340,6 +415,16 @@ def main():
     ap.add_argument("--include-tests", action="store_true", help="测试目录也纳入分析")
     ap.add_argument("--no-sniff", action="store_true", help="关闭 sql/xml 内容嗅探")
     ap.add_argument("--no-scan", action="store_true", help="关闭 LOC/符号扫描")
+    ap.add_argument("--all-files", action="store_true",
+                    help="忽略扩展名白名单，收录所有文件（除二进制）。真正的全覆盖")
+    ap.add_argument("--no-pack", dest="pack", action="store_false",
+                    help="关闭小目录拼块，回到“每个目录一个单元”")
+    ap.add_argument("--no-code-first", dest="code_first", action="store_false",
+                    help="关闭代码优先排序，PROGRESS 按目录大小排（旧行为）")
+    ap.set_defaults(pack=True, code_first=True)
+    ap.add_argument("--smart", action="store_true",
+                    help="启用预分类（SKIP 测试/生成物/种子数据、合并迁移链等）。"
+                         "默认关闭 = 无脑全覆盖，每个单元都是 TODO 逐文件分析")
     args = ap.parse_args()
 
     exts_str = args.exts or PRESETS[args.preset]
@@ -351,8 +436,9 @@ def main():
     os.makedirs(os.path.join(kit, "notes", args.name), exist_ok=True)
     os.makedirs(os.path.join(kit, "evidence", args.name), exist_ok=True)
 
-    print(f"扫描 {args.root} （preset={args.preset}）...", flush=True)
-    src, entries = collect(args.root, exts)
+    mode = "全文件" if args.all_files else f"preset={args.preset}"
+    print(f"扫描 {args.root} （{mode}）...", flush=True)
+    src, entries = collect(args.root, exts, args.all_files)
 
     by_dir = {}
     for f in src:
@@ -369,7 +455,8 @@ def main():
     units, merged = merge_small(by_dir, args.min)
     write_map(ws, args.name, args.root, src, entries, by_dir, merged, loc_by_dir, sym_cnt, args.top)
     n_units, stats = write_progress(ws, args.name, args.root, units, by_dir, args.chunk,
-                                    args.include_tests, not args.no_sniff)
+                                    args.include_tests, not args.no_sniff, args.smart, args.pack,
+                                    args.code_first)
 
     print(f"完成：{len(src)} 个源码文件（100% 进队列）→ {n_units} 个分析单元；"
           f"{len(merged)} 个小目录已归并")
