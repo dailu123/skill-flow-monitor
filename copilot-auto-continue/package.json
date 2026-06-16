@@ -1,8 +1,8 @@
 {
   "name": "copilot-auto-continue",
   "displayName": "Copilot Auto Continue",
-  "description": "检测 Copilot agent 对话变为空闲(停下)后,自动发送『继续』,不劫持鼠标键盘。",
-  "version": "0.0.5",
+  "description": "检测 Copilot agent 对话变为空闲(停下)后自动发『继续』;并提供并行驱动器模式,多窗口分片消费 PROGRESS 队列。",
+  "version": "0.1.0",
   "publisher": "local",
   "engines": {
     "vscode": "^1.90.0"
@@ -27,6 +27,14 @@
       {
         "command": "copilotAutoContinue.diagnose",
         "title": "Copilot Auto Continue: 诊断(显示监控路径)"
+      },
+      {
+        "command": "copilotAutoContinue.startDriver",
+        "title": "Copilot Auto Continue: 启动并行驱动器(认领分片循环跑)"
+      },
+      {
+        "command": "copilotAutoContinue.stopDriver",
+        "title": "Copilot Auto Continue: 停止并行驱动器"
       }
     ],
     "configuration": {
@@ -67,6 +75,41 @@
           "items": { "type": "string" },
           "default": ["state.json", "states.json"],
           "description": "扫描时忽略的文件名(不区分大小写)。这些是会话元数据,跟你聊不聊天无关也会变动,会造成误判。"
+        },
+        "copilotAutoContinue.driver.repo": {
+          "type": "string",
+          "default": "",
+          "description": "【驱动器模式】队列仓库名(如 mca/hub)。先用 parallel/shard.py split --repo <它> 切片。"
+        },
+        "copilotAutoContinue.driver.kitPath": {
+          "type": "string",
+          "default": "code-analysis-kit",
+          "description": "【驱动器模式】code-analysis-kit 相对工作区根的路径。"
+        },
+        "copilotAutoContinue.driver.idleSeconds": {
+          "type": "number",
+          "default": 90,
+          "description": "【驱动器模式】当前会话 .jsonl 连续多少秒无写入,判定这个单元处理完、可开下一个。"
+        },
+        "copilotAutoContinue.driver.maxUnitSeconds": {
+          "type": "number",
+          "default": 1800,
+          "description": "【驱动器模式】单个单元最多等多久(秒);超时就开下一个,防止卡死。"
+        },
+        "copilotAutoContinue.driver.shardStaleSeconds": {
+          "type": "number",
+          "default": 180,
+          "description": "【驱动器模式】分片认领锁的心跳过期秒数;某窗口崩了超过这个时间,锁可被别的窗口接管。"
+        },
+        "copilotAutoContinue.driver.submitStaleSeconds": {
+          "type": "number",
+          "default": 90,
+          "description": "【驱动器模式】全局提交锁的过期秒数(只在 newChat+提交+绑定会话的几秒内持有)。"
+        },
+        "copilotAutoContinue.driver.promptTemplate": {
+          "type": "string",
+          "default": "本轮仓库 R = {ns}。读取 {kit}/dot-github/copilot-instructions.md(操作宪法)与 {kit}/work/{ns}/PROGRESS.md。严格按宪法 LOOP PROTOCOL,只处理该 PROGRESS.md 的第一个 TODO 单元(仅此一个);宪法里所有 work/R、evidence/R、notes/R 路径中的 R 一律用 {ns}。完成后把该行状态改为 DONE。处理完这一个就立刻停止——不要继续下一个、不要提问、不要写超过三句总结、跳过第7步可视化刷新。",
+          "description": "【驱动器模式】每个单元发给 Copilot 的提示词模板。{ns}=分片命名空间,{kit}=kit 路径。"
         }
       }
     }
