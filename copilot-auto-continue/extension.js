@@ -1,7 +1,7 @@
 // Copilot Auto Continue
-// 原理:监控当前工作区 Copilot 对话的落盘文件(chatSessions/*.json)。
-//   - agent 正在干活时,文件会不停被写入(每走一步都写盘)。
-//   - 一旦停下,文件就不再变化。
+// 原理:监控当前工作区 Copilot 对话的落盘文件。
+//   - agent 干活时,chatSessions/ 或 chatEditingSessions/ 下的 json 会被写入。
+//   - 一旦停下,这些文件就不再变化。
 //   - 连续 idleSeconds 秒没有写入 => 判定为停止 => 用命令把『继续』提交进 chat。
 // 全程不碰鼠标键盘,你可以同时干别的。
 
@@ -18,34 +18,58 @@ let lastMtime = 0;            // 已观察到的最新写盘时间
 let lastChangeTs = 0;         // 上次检测到文件变化的本地时刻
 let cooldownUntil = 0;        // 冷却截止时刻
 let sawActivity = false;      // 开启/上次发送后,是否观察到过新的写盘
-                              // (必须先有活动、再变空闲,才会发继续——避免去捅一个早就结束的旧对话)
+let lastNewestFile = null;    // 最近变化的文件(诊断用)
 
 function cfg(key) {
   return vscode.workspace.getConfiguration('copilotAutoContinue').get(key);
 }
 
-// 通过扩展自己的 storageUri 反推出当前工作区的 chatSessions 目录。
 // storageUri = .../workspaceStorage/<hash>/<publisher.name>
-// 它的上一级 <hash> 目录下就有 chatSessions/
-function chatSessionsDir(context) {
-  if (!context.storageUri) return null; // 没打开工作区时没有
-  const hashDir = path.dirname(context.storageUri.fsPath);
-  return path.join(hashDir, 'chatSessions');
+// 它的上一级 <hash> 目录下有 chatSessions/ 和 chatEditingSessions/
+function hashDir(context) {
+  if (!context.storageUri) return null;
+  return path.dirname(context.storageUri.fsPath);
 }
 
-// 取目录下所有 .json 里最新的修改时间(毫秒)。目录不存在则返回 0。
-function latestMtime(dir) {
-  let m = 0;
+// 只监控 chat 相关目录,避免被 state.vscdb 等高频写入污染判断。
+function chatRoots(context) {
+  const h = hashDir(context);
+  if (!h) return [];
+  return [path.join(h, 'chatSessions'), path.join(h, 'chatEditingSessions')];
+}
+
+// 递归扫描目录里 .json 的最新修改时间。
+function latestMtimeIn(dir) {
+  let m = 0, newest = null;
+  let entries;
   try {
-    for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json')) continue;
-      const st = fs.statSync(path.join(dir, f));
-      if (st.mtimeMs > m) m = st.mtimeMs;
-    }
+    entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch (e) {
-    // 目录还不存在(还没产生过对话)等情况,忽略
+    return { m, newest };
   }
-  return m;
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      const r = latestMtimeIn(p);
+      if (r.m > m) { m = r.m; newest = r.newest; }
+    } else if (e.name.endsWith('.json')) {
+      try {
+        const st = fs.statSync(p);
+        if (st.mtimeMs > m) { m = st.mtimeMs; newest = p; }
+      } catch (e2) { /* ignore */ }
+    }
+  }
+  return { m, newest };
+}
+
+// 取所有 chat 目录里最新的写盘时间。
+function latestMtime(context) {
+  let m = 0, newest = null;
+  for (const d of chatRoots(context)) {
+    const r = latestMtimeIn(d);
+    if (r.m > m) { m = r.m; newest = r.newest; }
+  }
+  return { m, newest };
 }
 
 function setStatus(text, tooltip) {
@@ -80,18 +104,19 @@ async function sendContinue() {
 
 function tick(context) {
   if (!enabled) return;
-  const dir = chatSessionsDir(context);
-  if (!dir) {
+  if (chatRoots(context).length === 0) {
     setStatus('$(sync~spin) Auto继续: 无工作区', '没有打开工作区,无法定位对话文件');
     return;
   }
 
   const now = Date.now();
-  const m = latestMtime(dir);
+  const res = latestMtime(context);
+  const m = res.m;
   if (m > lastMtime) {
     lastMtime = m;
     lastChangeTs = now;
-    sawActivity = true; // 观察到 agent 在写盘 = 它活着
+    sawActivity = true;
+    lastNewestFile = res.newest;
   }
 
   if (now < cooldownUntil) {
@@ -110,17 +135,38 @@ function tick(context) {
   }
 
   if (!sawActivity) {
-    setStatus('$(eye) Auto继续: 等待活动', '等 agent 开始干活后才会接管(避免去捅已结束的对话)');
+    setStatus('$(eye) Auto继续: 等待活动',
+      '等 agent 开始写盘后才会接管。若 agent 明明在干活却一直停在这,运行命令「Copilot Auto Continue: 诊断」看监控路径');
   } else {
     const idleLeft = Math.max(0, Math.ceil((idleLimit - idleMs) / 1000));
     setStatus(`$(eye) Auto继续: 监控中 ${idleLeft}s`, `空闲 ${idleLeft}s 后将发送继续 | 已发 ${continueCount} 次`);
   }
 }
 
+function diagnose(context) {
+  const roots = chatRoots(context);
+  const res = latestMtime(context);
+  const ageSec = res.m ? Math.round((Date.now() - res.m) / 1000) : -1;
+  const lines = [
+    `enabled = ${enabled}`,
+    `sawActivity = ${sawActivity}`,
+    `已自动发送 = ${continueCount} 次`,
+    '',
+    '监控的目录:',
+    ...roots.map(r => `  ${fs.existsSync(r) ? '✓存在' : '✗不存在'}  ${r}`),
+    '',
+    `最近变化的文件: ${res.newest || lastNewestFile || '(无)'}`,
+    `距今: ${ageSec < 0 ? '没扫到任何 .json' : ageSec + ' 秒前'}`,
+  ];
+  const msg = lines.join('\n');
+  console.log('[CopilotAutoContinue]\n' + msg);
+  vscode.window.showInformationMessage('Copilot Auto Continue 诊断(详情见开发人员工具 Console)', { modal: true, detail: msg });
+}
+
 function start(context) {
   enabled = true;
   continueCount = 0;
-  lastMtime = latestMtime(chatSessionsDir(context) || '');
+  lastMtime = latestMtime(context).m;
   lastChangeTs = Date.now();
   cooldownUntil = 0;
   sawActivity = false;
@@ -144,9 +190,11 @@ function activate(context) {
       else start(context);
     })
   );
-
   context.subscriptions.push(
     vscode.commands.registerCommand('copilotAutoContinue.sendNow', () => sendContinue())
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('copilotAutoContinue.diagnose', () => diagnose(context))
   );
 
   if (cfg('enabledOnStartup')) start(context);
