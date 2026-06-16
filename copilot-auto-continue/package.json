@@ -2,7 +2,7 @@
   "name": "copilot-auto-continue",
   "displayName": "Copilot Auto Continue",
   "description": "检测 Copilot agent 对话变为空闲(停下)后,自动发送『继续』,不劫持鼠标键盘。",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "local",
   "engines": {
     "vscode": "^1.90.0"
@@ -39,7 +39,7 @@
         },
         "copilotAutoContinue.idleSeconds": {
           "type": "number",
-          "default": 30,
+          "default": 300,
           "description": "对话文件连续多少秒无写入,判定为『已停止』并发送继续。太短会在模型思考时误触发。"
         },
         "copilotAutoContinue.message": {
@@ -49,18 +49,24 @@
         },
         "copilotAutoContinue.pollSeconds": {
           "type": "number",
-          "default": 2,
+          "default": 5,
           "description": "每隔几秒检查一次对话文件。"
         },
         "copilotAutoContinue.cooldownSeconds": {
           "type": "number",
-          "default": 12,
+          "default": 300,
           "description": "发送继续后冷却多少秒再恢复监控,避免重复触发。"
         },
         "copilotAutoContinue.maxContinues": {
           "type": "number",
           "default": 100,
           "description": "本次开启后最多自动发送多少次继续(防止任务真干完后无限刷),到达上限自动停。"
+        },
+        "copilotAutoContinue.ignoreFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["state.json", "states.json"],
+          "description": "扫描时忽略的文件名(不区分大小写)。这些是会话元数据,跟你聊不聊天无关也会变动,会造成误判。"
         }
       }
     }

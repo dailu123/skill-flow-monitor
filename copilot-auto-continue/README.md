@@ -57,11 +57,12 @@
 | 设置 | 默认 | 说明 |
 |---|---|---|
 | `enabledOnStartup` | `false` | 启动即开启监控 |
-| `idleSeconds` | `30` | 空闲多少秒判定为停止(太短会在模型思考时误触发) |
+| `idleSeconds` | `300` | 空闲多少秒判定为停止(太短会在模型思考时误触发) |
 | `message` | `继续` | 自动发送的内容 |
-| `pollSeconds` | `2` | 检查文件的间隔 |
-| `cooldownSeconds` | `12` | 发送后冷却多久再恢复监控 |
+| `pollSeconds` | `5` | 检查文件的间隔 |
+| `cooldownSeconds` | `300` | 发送后冷却多久再恢复监控 |
 | `maxContinues` | `100` | 本次最多自动发多少次(防止任务真干完后无限刷) |
+| `ignoreFiles` | `["state.json","states.json"]` | 扫描时忽略的文件名(会话元数据,跟聊天无关也会变,会误判) |
 
 ## 注意 / 调试
 

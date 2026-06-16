@@ -38,8 +38,14 @@ function chatRoots(context) {
   return [path.join(h, 'chatSessions'), path.join(h, 'chatEditingSessions')];
 }
 
-// 递归扫描目录里 .json 的最新修改时间。
-function latestMtimeIn(dir) {
+// 当前要忽略的文件名集合(小写)。state.json 等元数据跟聊天无关也会变动。
+function ignoreSet() {
+  const list = cfg('ignoreFiles') || ['state.json', 'states.json'];
+  return new Set(list.map(s => String(s).toLowerCase()));
+}
+
+// 递归扫描目录里 .json 的最新修改时间,跳过被忽略的文件。
+function latestMtimeIn(dir, ignore) {
   let m = 0, newest = null;
   let entries;
   try {
@@ -50,9 +56,9 @@ function latestMtimeIn(dir) {
   for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      const r = latestMtimeIn(p);
+      const r = latestMtimeIn(p, ignore);
       if (r.m > m) { m = r.m; newest = r.newest; }
-    } else if (e.name.endsWith('.json')) {
+    } else if (e.name.endsWith('.json') && !ignore.has(e.name.toLowerCase())) {
       try {
         const st = fs.statSync(p);
         if (st.mtimeMs > m) { m = st.mtimeMs; newest = p; }
@@ -64,9 +70,10 @@ function latestMtimeIn(dir) {
 
 // 取所有 chat 目录里最新的写盘时间。
 function latestMtime(context) {
+  const ignore = ignoreSet();
   let m = 0, newest = null;
   for (const d of chatRoots(context)) {
-    const r = latestMtimeIn(d);
+    const r = latestMtimeIn(d, ignore);
     if (r.m > m) { m = r.m; newest = r.newest; }
   }
   return { m, newest };
@@ -155,6 +162,7 @@ function diagnose(context) {
     '监控的目录:',
     ...roots.map(r => `  ${fs.existsSync(r) ? '✓存在' : '✗不存在'}  ${r}`),
     '',
+    `忽略的文件: ${[...ignoreSet()].join(', ') || '(无)'}`,
     `最近变化的文件: ${res.newest || lastNewestFile || '(无)'}`,
     `距今: ${ageSec < 0 ? '没扫到任何 .json' : ageSec + ' 秒前'}`,
   ];
