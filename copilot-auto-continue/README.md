@@ -9,17 +9,38 @@
 - 扩展监控这些文件:**连续 N 秒不再写入** = 它停了 → 用官方命令 `workbench.action.chat.open` 把「继续」提交进当前 chat。
 - 这两件事都在扩展内部完成,不模拟键鼠,不抢焦点。
 
-## 安装(无需编译,纯 JS)
+## 安装
 
-把整个 `copilot-auto-continue` 文件夹复制到 VSCode 的扩展目录:
+### 方式一:装 .vsix(推荐,最稳)
 
-- Windows:`%USERPROFILE%\.vscode\extensions\copilot-auto-continue\`
-- macOS/Linux:`~/.vscode/extensions/copilot-auto-continue/`
+本目录已附带打包好的 `copilot-auto-continue-0.0.1.vsix`。任选一种:
 
-即:`...\.vscode\extensions\copilot-auto-continue\package.json` 这样的结构。
-然后**完全重启 VSCode**(或命令面板运行 `Developer: Reload Window`)。
+- 命令行:
+  ```
+  code --install-extension copilot-auto-continue-0.0.1.vsix
+  ```
+- 或:扩展侧栏右上角 `...` 菜单 → **Install from VSIX...** → 选这个文件。
 
-> 或者:用 VSCode 打开本文件夹,按 `F5` 启动「扩展开发宿主」窗口测试。
+装完 `Developer: Reload Window` 或重启 VSCode。
+
+### 方式二:直接复制文件夹(不一定生效,新版 VSCode 常忽略)
+
+把整个 `copilot-auto-continue` 文件夹复制到扩展目录,**注意 `package.json` 必须直接在该层、不能套娃**:
+
+- Windows:`%USERPROFILE%\.vscode\extensions\copilot-auto-continue\package.json`
+- macOS/Linux:`~/.vscode/extensions/copilot-auto-continue/package.json`
+- Insiders 版要放 `.vscode-insiders\extensions\`
+
+然后**完全退出并重启 VSCode**(光关窗口不够)。
+
+> 装完确认:命令面板运行 `Developer: Show Running Extensions`,或扩展侧栏搜 `Copilot Auto Continue`。
+> 加载成功的话右下角状态栏会出现 `Auto继续: 关`。看不到就是没加载,改用方式一。
+
+### 方式三:开发调试
+
+用 VSCode 打开本文件夹,按 `F5` 启动「扩展开发宿主」窗口测试。
+
+> 你**不需要**手工往 settings.json 里加任何配置,所有设置都有默认值,装上即可用。
 
 ## 使用
 
