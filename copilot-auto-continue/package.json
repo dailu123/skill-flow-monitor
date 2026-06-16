@@ -2,7 +2,7 @@
   "name": "copilot-auto-continue",
   "displayName": "Copilot Auto Continue",
   "description": "检测 Copilot agent 对话变为空闲(停下)后,自动发送『继续』,不劫持鼠标键盘。",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "local",
   "engines": {
     "vscode": "^1.90.0"
