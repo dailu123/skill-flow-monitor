@@ -1,13 +1,19 @@
 // Copilot Auto Continue
 // 原理:监控当前工作区 Copilot 对话的落盘文件。
-//   - agent 干活时,chatSessions/ 或 chatEditingSessions/ 下的 json 会被写入。
+//   - 真正的对话转录是 chatSessions/<uuid>.jsonl(JSON Lines),agent 每产生一步都会往里追加。
 //   - 一旦停下,这些文件就不再变化。
 //   - 连续 idleSeconds 秒没有写入 => 判定为停止 => 用命令把『继续』提交进 chat。
+// 注意:chatEditingSessions/ 里的 state.json 跟聊天无关也会变,默认忽略,只认 .jsonl/.json 转录。
 // 全程不碰鼠标键盘,你可以同时干别的。
 
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+
+// 对话转录文件:.jsonl 是主力,.json 兼容旧版本。
+function isWatchedFile(name) {
+  return name.endsWith('.jsonl') || name.endsWith('.json');
+}
 
 let enabled = false;          // 当前是否在监控
 let statusBar = null;         // 状态栏按钮
@@ -58,7 +64,7 @@ function latestMtimeIn(dir, ignore) {
     if (e.isDirectory()) {
       const r = latestMtimeIn(p, ignore);
       if (r.m > m) { m = r.m; newest = r.newest; }
-    } else if (e.name.endsWith('.json') && !ignore.has(e.name.toLowerCase())) {
+    } else if (isWatchedFile(e.name) && !ignore.has(e.name.toLowerCase())) {
       try {
         const st = fs.statSync(p);
         if (st.mtimeMs > m) { m = st.mtimeMs; newest = p; }
@@ -162,7 +168,7 @@ function collectJson(dir, baseDir, acc) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
       collectJson(p, baseDir, acc);
-    } else if (e.name.endsWith('.json')) {
+    } else if (isWatchedFile(e.name)) {
       try {
         const st = fs.statSync(p);
         acc.push({ rel: path.relative(baseDir, p), mtimeMs: st.mtimeMs, size: st.size });
