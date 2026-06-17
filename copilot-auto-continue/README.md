@@ -9,43 +9,54 @@
 > 检测原理:对话转录是 `…/workspaceStorage/<hash>/chatSessions/<uuid>.jsonl`,agent 每走一步往里追加,
 > 停下就不再变化。扩展监控它的修改时间判断「在跑 / 停了」,全程不模拟键鼠、不抢焦点。
 
-## 并行驱动器模式(driver)—— 把 2000 片任务多窗口跑完
+## 多人分块协作 —— 把 N 千个块分给若干人,各跑各的,Git 汇总
 
-适用场景:`PROGRESS.md` 是一张任务队列表,Copilot 按 `copilot-instructions.md` 的 LOOP 逐单元处理。
-要 N 路并行又不让多个 agent 写崩同一批文件,做法是**分片成 N 个独立命名空间**(各有自己的
-`work/`、`evidence/`、`notes/`),每个窗口跑一个分片,最后合并。
+适用场景:`PROGRESS.md` 是任务队列表,Copilot 按 `copilot-instructions.md` 的 LOOP 逐单元处理。
+要多人分工又**不让大家改崩同一批文件**,做法是**分片成独立命名空间**(各有自己的
+`work/`、`evidence/`、`notes/`)——不同人改的是完全不同的文件,**Git 合并零冲突**。
 
-### 步骤
+### 维护者(一次性)
 
 ```bash
-# 1) 切片:把 work/<repo>/PROGRESS.md 按"文件数"均衡切成 5 片(<repo>__s1..__s5)
-python code-analysis-kit/parallel/shard.py split --repo mca --shards 5
+# 1) 切片(按"文件数"均衡):hub 2000 → 10 片,mca 1000 → 10 片
+python code-analysis-kit/parallel/shard.py split --repo hub --shards 10
+python code-analysis-kit/parallel/shard.py split --repo mca --shards 10
 
-# 2) 开 5 个 VSCode 窗口,都打开本仓库,都装本扩展。
-#    在设置里填:  "copilotAutoContinue.driver.repo": "mca"
-#    每个窗口运行命令面板:  Copilot Auto Continue: 启动并行驱动器
-#    → 每个窗口自动认领一个还没人占的分片,开始循环逐单元跑(每个单元一个新会话,上下文干净)。
+# 2) 分配 + 生成每人可复制的「咒语」→ 写出 code-analysis-kit/ASSIGNMENTS.md
+python code-analysis-kit/parallel/shard.py assign --repos hub,mca --people 10
 
-# 3) 随时看进度
-python code-analysis-kit/parallel/shard.py status --repo mca
-
-# 4) 全部跑完后合并回 work/mca、evidence/mca、notes/mca
-python code-analysis-kit/parallel/shard.py merge --repo mca
-# 确认无误再清理分片目录(可选)
-python code-analysis-kit/parallel/shard.py clean --repo mca
+# 把分片目录、shards.json、ASSIGNMENTS.md 提交推送
 ```
 
-### 关键设计 / 注意
+### 每个人
 
-- **每个分片 = 一个独立"仓库" R**(`mca__s1`…)。提示词告诉 agent「本轮 R = mca__s1」,
+1. `git pull` → 打开本仓库 → 装本扩展(见下方安装)。
+2. 在 `ASSIGNMENTS.md` 找到自己负责的命名空间(如 `hub__s3`、`mca__s3`)。
+3. 对**每个命名空间**:在 Copilot agent 里**新开一个会话**,把该命名空间的「咒语」粘贴进去回车。
+4. 点右下角状态栏开启 **babysit** —— agent 跑一会儿停了,它会自动发「继续」,你可以去干别的。
+5. 跑完后**只提交自己命名空间的目录**(`work/<ns>`、`evidence/<ns>`、`notes/<ns>`),发 PR。
+
+### 维护者汇总
+
+```bash
+# 看总进度
+python code-analysis-kit/parallel/shard.py status --repo hub
+# 合并所有人的 PR(因为各改各的文件,不会冲突),然后折叠回主仓库
+python code-analysis-kit/parallel/shard.py merge --repo hub
+python code-analysis-kit/parallel/shard.py merge --repo mca
+```
+
+### 关键点 / 注意
+
+- **每个分片 = 一个独立"仓库" R**(`hub__s3`…)。咒语告诉 agent「本轮 R = hub__s3」,
   你现成的 `copilot-instructions.md` 里所有 `work/R`、`evidence/R`、`notes/R` 自动落到该分片目录,**零写冲突,不用改宪法**。
-- **认领锁**:`work/<ns>/.worker-lock`(带心跳)。某窗口崩了,锁过期后(默认 180s)别的窗口可接管。
-- **提交锁**:`work/<repo>/.submit-lock`,只在「开新会话+提交+绑定会话文件」的几秒内持有,
-  保证多窗口不会绑错对方的会话。长时间的 agent 执行仍是并行的。
-- **判定单元完成**:绑定的 `.jsonl` 连续 `driver.idleSeconds`(默认 90s)无写入 = 这个单元跑完。
-- **卡住保护**:连续 3 个单元 TODO 没减少(可能卡在等批准/出错)→ 释放该分片并提示。
-  建议把 Copilot 的命令自动批准打开(`chat.tools.autoApprove`),否则它会停在 Allow 上。
-- driver 模式相关设置都在 `copilotAutoContinue.driver.*`(repo / kitPath / idleSeconds / maxUnitSeconds / promptTemplate …)。
+- **每人本地要有被分析的源码**:`PROGRESS.md` 顶部 `ROOT:` 指向真实源码路径,分析要读源文件;
+  约定好统一路径,源码本身别提交进本仓库(`.gitignore` 掉)。
+- 建议每人打开 `chat.tools.autoApprove`,否则 agent 会停在「Allow」批准上,babysit 发「继续」也推不动。
+- `merge` 会智能去重 CSV 表头、按 ID 回填 PROGRESS 状态、搬运 notes;确认无误后可 `clean` 清分片目录。
+
+> 注:扩展里还有一个 `driver` 单机自动模式(命令「启动并行驱动器」),能在一个窗口里循环逐单元跑;
+> 多人分工场景用不到它,上面的「咒语 + babysit」就够。
 
 ## babysit 原理
 

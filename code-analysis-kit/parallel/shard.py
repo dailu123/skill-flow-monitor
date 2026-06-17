@@ -27,7 +27,17 @@ import sys
 from datetime import datetime
 
 KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # code-analysis-kit/
+KIT_REL = os.path.basename(KIT)  # 仓库根下 kit 目录名,用于咒语里的相对路径
 STATUSES = ("TODO", "IN_PROGRESS", "DONE", "SKIP", "ERROR")
+
+# 每个命名空间的"咒语":在 Copilot agent 里新开会话粘贴这段,它会按宪法把这片所有 TODO 跑完。
+SPELL = (
+    "本轮仓库 R = {ns}。读取 {kit}/dot-github/copilot-instructions.md（操作宪法）和 "
+    "{kit}/work/{ns}/PROGRESS.md。宪法里所有 work/R、evidence/R、notes/R 路径中的 R "
+    "一律用 {ns}。严格按宪法的 LOOP PROTOCOL 连续处理 PROGRESS.md 里的每一个 TODO 单元，"
+    "直到没有 TODO 为止：每个单元完成就把该行改成 DONE 并按宪法追加证据 / 写笔记。"
+    "不要问我、不要等待、不要写超过三句总结、跳过第7步可视化刷新。"
+)
 SEP_RE = re.compile(r"^\|[\s:|-]+\|?\s*$")          # 表格分隔行 |----|----|
 ROW_RE = re.compile(r"^\|.*\|\s*$")                  # 任意表格行
 
@@ -233,6 +243,49 @@ def cmd_merge(repo):
     print("合并完成。确认无误后可 `clean` 清掉分片目录。")
 
 
+def _todo_of(ns):
+    if not os.path.exists(progress(ns)):
+        return 0
+    _, data = parse_progress(open(progress(ns), encoding="utf-8").read())
+    return sum(1 for r in data if row_status(r) == "TODO")
+
+
+def cmd_assign(repos_csv, people):
+    repos = [r.strip() for r in repos_csv.split(",") if r.strip()]
+    all_ns = []
+    for r in repos:
+        ns = _namespaces(r)
+        if not ns:
+            sys.exit(f"仓库 {r} 没有分片,先 split。")
+        all_ns += ns
+    # 轮转分配:第 i 个命名空间给第 (i % people) 个人,跨仓库自然均衡
+    buckets = [[] for _ in range(people)]
+    for i, ns in enumerate(all_ns):
+        buckets[i % people].append(ns)
+
+    out = [f"# 分块任务分配（{people} 人）\n",
+           "> 每人:`git pull` → 打开本仓库 → 装 copilot-auto-continue 扩展。",
+           "> 对你负责的**每个命名空间**,新开一个 Copilot agent 会话,把对应「咒语」粘贴进去回车;",
+           "> 然后点右下角状态栏开启 babysit(它会在 agent 停下时自动发「继续」,你可以去干别的)。",
+           "> 跑完后**只提交你自己命名空间的目录**(work/<ns>、evidence/<ns>、notes/<ns>),发 PR。\n"]
+    for pi in range(people):
+        nss = buckets[pi]
+        if not nss:
+            continue
+        summary = ", ".join(f"{ns}(TODO {_todo_of(ns)})" for ns in nss)
+        out.append(f"\n## 第 {pi + 1} 人\n负责:{summary}")
+        for ns in nss:
+            spell = SPELL.format(ns=ns, kit=KIT_REL)
+            out.append(f"\n### 咒语 — {ns}\n```\n{spell}\n```")
+    path_out = os.path.join(KIT, "ASSIGNMENTS.md")
+    open(path_out, "w", encoding="utf-8").write("\n".join(out) + "\n")
+    print(f"分配表写入 {path_out}")
+    for pi in range(people):
+        if buckets[pi]:
+            print(f"  第 {pi + 1} 人:{', '.join(buckets[pi])}  "
+                  f"(TODO 合计 {sum(_todo_of(ns) for ns in buckets[pi])})")
+
+
 def cmd_clean(repo):
     for ns in _namespaces(repo):
         for d in (work(ns), evidence(ns), notes(ns)):
@@ -252,6 +305,9 @@ def main():
         p.add_argument("--repo", required=True)
         if name == "split":
             p.add_argument("--shards", type=int, default=5)
+    pa = sub.add_parser("assign")
+    pa.add_argument("--repos", required=True, help="逗号分隔,如 hub,mca")
+    pa.add_argument("--people", type=int, required=True)
     args = ap.parse_args()
 
     if args.cmd == "split":
@@ -265,6 +321,10 @@ def main():
         cmd_merge(args.repo)
     elif args.cmd == "clean":
         cmd_clean(args.repo)
+    elif args.cmd == "assign":
+        if args.people < 1:
+            sys.exit("--people 至少 1")
+        cmd_assign(args.repos, args.people)
 
 
 if __name__ == "__main__":
