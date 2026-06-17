@@ -166,25 +166,28 @@ def cmd_status(repo):
           f"DONE={total['DONE']:4d} SKIP={total['SKIP']:3d} ERROR={total['ERROR']:3d}")
 
 
-def _append_csv(src, dst):
-    """把 src 的数据行追加到 dst;若 dst 不存在则连表头一起拷;否则跳过 src 表头。"""
+def _append_csv(src, dst, dry=False):
+    """把 src 的数据行追加到 dst;若 dst 不存在则连表头一起拷;否则跳过 src 表头。返回追加行数。"""
     if not os.path.exists(src):
         return 0
     lines = open(src, encoding="utf-8").read().splitlines()
     if not lines:
         return 0
     first = not os.path.exists(dst)
-    with open(dst, "a", encoding="utf-8") as f:
-        body = lines if first else lines[1:]   # 非首次跳过表头
-        for l in body:
-            f.write(l + "\n")
-    return max(0, len(lines) - (0 if first else 1))
+    body = lines if first else lines[1:]   # 非首次跳过表头
+    if not dry:
+        with open(dst, "a", encoding="utf-8") as f:
+            for l in body:
+                f.write(l + "\n")
+    return len(body)
 
 
-def cmd_merge(repo):
-    os.makedirs(work(repo), exist_ok=True)
-    os.makedirs(evidence(repo), exist_ok=True)
-    os.makedirs(notes(repo), exist_ok=True)
+def cmd_merge(repo, dry=False):
+    tag = "[预览] " if dry else ""
+    if not dry:
+        os.makedirs(work(repo), exist_ok=True)
+        os.makedirs(evidence(repo), exist_ok=True)
+        os.makedirs(notes(repo), exist_ok=True)
 
     # 1) 合并 PROGRESS:用各分片的行状态更新主表(按 ID 覆盖)
     if os.path.exists(progress(repo)):
@@ -198,10 +201,12 @@ def cmd_merge(repo):
             for r in sdata:
                 rid = row_id(r)
                 if rid in by_id:
-                    data[by_id[rid]] = r
+                    if not dry:
+                        data[by_id[rid]] = r
                     updated += 1
-        open(progress(repo), "w", encoding="utf-8").write("\n".join(header + data) + "\n")
-        print(f"PROGRESS:回填 {updated} 行状态")
+        if not dry:
+            open(progress(repo), "w", encoding="utf-8").write("\n".join(header + data) + "\n")
+        print(f"{tag}PROGRESS:回填 {updated} 行状态")
 
     # 2) 合并 evidence(csv 智能去重表头;md / 其它直接拼接)
     seen = {}
@@ -214,14 +219,18 @@ def cmd_merge(repo):
                 rel = os.path.relpath(os.path.join(root, fn), ev)
                 src = os.path.join(ev, rel)
                 dst = os.path.join(evidence(repo), rel)
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
                 if fn.endswith(".csv"):
-                    seen[rel] = seen.get(rel, 0) + _append_csv(src, dst)
+                    if not dry:
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    seen[rel] = seen.get(rel, 0) + _append_csv(src, dst, dry)
                 else:
-                    with open(dst, "a", encoding="utf-8") as f:
-                        f.write(open(src, encoding="utf-8").read().rstrip() + "\n\n")
+                    seen[rel] = seen.get(rel, 0) + 1
+                    if not dry:
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        with open(dst, "a", encoding="utf-8") as f:
+                            f.write(open(src, encoding="utf-8").read().rstrip() + "\n\n")
     for rel, n in seen.items():
-        print(f"evidence:{rel} 追加 {n} 行")
+        print(f"{tag}evidence:{rel} {'追加' if rel.endswith('.csv') else '拼接'} {n} {'行' if rel.endswith('.csv') else '段'}")
 
     # 3) 合并 notes(逐文件搬过去,重名加分片后缀)
     moved = 0
@@ -237,10 +246,12 @@ def cmd_merge(repo):
             if os.path.exists(dst):
                 stem, ext = os.path.splitext(fn)
                 dst = os.path.join(notes(repo), f"{stem}.{ns}{ext}")
-            shutil.copy2(src, dst)
+            if not dry:
+                shutil.copy2(src, dst)
             moved += 1
-    print(f"notes:搬运 {moved} 个文件")
-    print("合并完成。确认无误后可 `clean` 清掉分片目录。")
+    print(f"{tag}notes:搬运 {moved} 个文件")
+    print(f"{tag}" + ("预览结束,未改动任何文件;去掉 --dry-run 才会真正写入。"
+                      if dry else "合并完成。确认无误后可 `clean` 清掉分片目录。"))
 
 
 def _todo_of(ns):
@@ -277,6 +288,23 @@ def cmd_assign(repos_csv, people):
         for ns in nss:
             spell = SPELL.format(ns=ns, kit=KIT_REL)
             out.append(f"\n### 咒语 — {ns}\n```\n{spell}\n```")
+    # 给协作者的 Git 提交步骤(各改各文件,合并零冲突)
+    egns = buckets[0][0] if buckets and buckets[0] else "hub__s1"
+    kit = KIT_REL
+    out.append(
+        "\n---\n\n## 提交步骤(给协作者)\n"
+        "\n你只改自己命名空间的目录,所以和别人**不会冲突**。跑完后:\n"
+        "\n```bash\n"
+        f"git switch -c work/你的名字           # 开自己的分支\n"
+        f"# 只 add 你负责的命名空间目录(每个 ns 三处),例如 {egns}:\n"
+        f"git add {kit}/work/{egns} {kit}/evidence/{egns} {kit}/notes/{egns}\n"
+        f"git commit -m \"分析 {egns}\"\n"
+        f"git push -u origin work/你的名字       # 然后在 GitHub 上发 PR\n"
+        "```\n"
+        "\n> 注意:**不要** `git add .`,以免带上别人的改动或本地源码;只 add 自己那几个 ns 目录。\n"
+        "> 被分析的源码不要提交进本仓库。"
+    )
+
     path_out = os.path.join(KIT, "ASSIGNMENTS.md")
     open(path_out, "w", encoding="utf-8").write("\n".join(out) + "\n")
     print(f"分配表写入 {path_out}")
@@ -305,6 +333,8 @@ def main():
         p.add_argument("--repo", required=True)
         if name == "split":
             p.add_argument("--shards", type=int, default=5)
+        if name == "merge":
+            p.add_argument("--dry-run", action="store_true", help="只预览汇总结果,不写任何文件")
     pa = sub.add_parser("assign")
     pa.add_argument("--repos", required=True, help="逗号分隔,如 hub,mca")
     pa.add_argument("--people", type=int, required=True)
@@ -318,7 +348,7 @@ def main():
     elif args.cmd == "status":
         cmd_status(args.repo)
     elif args.cmd == "merge":
-        cmd_merge(args.repo)
+        cmd_merge(args.repo, dry=args.dry_run)
     elif args.cmd == "clean":
         cmd_clean(args.repo)
     elif args.cmd == "assign":
