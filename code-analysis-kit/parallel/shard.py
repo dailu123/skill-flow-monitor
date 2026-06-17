@@ -82,37 +82,50 @@ def row_filecount(row):
     return 1
 
 
-def cmd_split(repo, shards):
+def _sanitize(name):
+    """人名做命名空间用:去掉空格和路径分隔符,其余(含中文)保留。"""
+    return re.sub(r"[\s/\\:]+", "_", name.strip())
+
+
+def _split_sequential(rows, n):
+    """按原顺序连续切成 n 段,大小尽量均匀(前几段多 1 行)。不打乱、不重排。"""
+    k, m = divmod(len(rows), n)
+    out, i = [], 0
+    for j in range(n):
+        size = k + (1 if j < m else 0)
+        out.append(rows[i:i + size])
+        i += size
+    return out
+
+
+def cmd_split(repo, shards=None, names=None):
     if not os.path.exists(progress(repo)):
         sys.exit(f"找不到 {progress(repo)}")
-    text = open(progress(repo), encoding="utf-8").read()
-    header, data = parse_progress(text)
+    header, data = parse_progress(open(progress(repo), encoding="utf-8").read())
 
-    # 均衡装箱:按文件数从大到小,每行丢进当前最轻的分片(LPT)
-    buckets = [[] for _ in range(shards)]
-    loads = [0] * shards
-    for row in sorted(data, key=row_filecount, reverse=True):
-        k = loads.index(min(loads))
-        buckets[k].append(row)
-        loads[k] += row_filecount(row)
+    # 标签:用人名(命名空间=<repo>__<人名>)或 s1..sN
+    if names:
+        labels = [_sanitize(nm) for nm in names]
+    else:
+        labels = [f"s{k + 1}" for k in range(shards)]
 
-    # 还原每片内部顺序(按 ID 排)让人看着舒服
+    # 严格按 PROGRESS 顺序连续切(不重排、不均衡装箱)
+    groups = _split_sequential(data, len(labels))
+
     namespaces = []
-    for k in range(shards):
-        ns = ns_name(repo, k + 1)
-        rows = sorted(buckets[k], key=row_id)
+    for label, rows in zip(labels, groups):
+        ns = f"{repo}__{label}"
         _write_shard(repo, ns, header, rows)
         namespaces.append(ns)
         todo = sum(1 for r in rows if row_status(r) == "TODO")
-        print(f"  {ns}: {len(rows)} 行 (TODO {todo}, 文件数合计 {loads[k]})")
+        files = sum(row_filecount(r) for r in rows)
+        print(f"  {ns}: {len(rows)} 行 (TODO {todo}, 文件数合计 {files})")
 
-    json.dump({"repo": repo, "shards": namespaces,
+    json.dump({"repo": repo, "shards": namespaces, "labels": labels,
                "created": datetime.now().isoformat(timespec="seconds")},
               open(manifest_path(repo), "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     print(f"清单写入 {manifest_path(repo)}")
-    print(f"\n下一步:开 {shards} 个 VSCode 窗口都打开本仓库,装上 copilot-auto-continue 扩展,")
-    print(f"设置 copilotAutoContinue.driver.repo = \"{repo}\",各窗口运行命令「启动并行驱动器」。")
 
 
 def _write_shard(repo, ns, header, rows):
@@ -148,7 +161,16 @@ def _namespaces(repo):
     # 兜底:扫目录
     base = os.path.join(KIT, "work")
     return sorted(d for d in os.listdir(base)
-                  if d.startswith(f"{repo}__s") and os.path.isdir(os.path.join(base, d)))
+                  if d.startswith(f"{repo}__") and os.path.isdir(os.path.join(base, d)))
+
+
+def _labels(repo):
+    """返回该仓库的标签(人名/sK)顺序;没有清单就从命名空间名推。"""
+    if os.path.exists(manifest_path(repo)):
+        m = json.load(open(manifest_path(repo), encoding="utf-8"))
+        if m.get("labels"):
+            return m["labels"]
+    return [ns[len(repo) + 2:] for ns in _namespaces(repo)]
 
 
 def cmd_status(repo):
@@ -261,45 +283,43 @@ def _todo_of(ns):
     return sum(1 for r in data if row_status(r) == "TODO")
 
 
-def cmd_assign(repos_csv, people):
+def cmd_assign(repos_csv):
     repos = [r.strip() for r in repos_csv.split(",") if r.strip()]
-    all_ns = []
+    # 按人名(标签)归组;人名顺序取各仓库 split 时的 labels 顺序(即输入顺序),跨仓库去重保序
+    people = []
     for r in repos:
-        ns = _namespaces(r)
-        if not ns:
+        if not _namespaces(r):
             sys.exit(f"仓库 {r} 没有分片,先 split。")
-        all_ns += ns
-    # 轮转分配:第 i 个命名空间给第 (i % people) 个人,跨仓库自然均衡
-    buckets = [[] for _ in range(people)]
-    for i, ns in enumerate(all_ns):
-        buckets[i % people].append(ns)
+        for lb in _labels(r):
+            if lb not in people:
+                people.append(lb)
+    # 人 → 他在各仓库的命名空间(存在的才算)
+    nss_of = {p: [f"{r}__{p}" for r in repos if os.path.isdir(work(f"{r}__{p}"))] for p in people}
 
-    out = [f"# 分块任务分配（{people} 人）\n",
+    out = [f"# 分块任务分配（{len(people)} 人）\n",
            "> 每人:`git pull` → 打开本仓库 → 装 copilot-auto-continue 扩展。",
            "> 对你负责的**每个命名空间**,新开一个 Copilot agent 会话,把对应「咒语」粘贴进去回车;",
            "> 然后点右下角状态栏开启 babysit(它会在 agent 停下时自动发「继续」,你可以去干别的)。",
            "> 跑完后**只提交你自己命名空间的目录**(work/<ns>、evidence/<ns>、notes/<ns>),发 PR。\n"]
-    for pi in range(people):
-        nss = buckets[pi]
+    for p in people:
+        nss = nss_of[p]
         if not nss:
             continue
         summary = ", ".join(f"{ns}(TODO {_todo_of(ns)})" for ns in nss)
-        out.append(f"\n## 第 {pi + 1} 人\n负责:{summary}")
+        out.append(f"\n## {p}\n负责:{summary}")
         for ns in nss:
-            spell = SPELL.format(ns=ns, kit=KIT_REL)
-            out.append(f"\n### 咒语 — {ns}\n```\n{spell}\n```")
-    # 给协作者的 Git 提交步骤(各改各文件,合并零冲突)
-    egns = buckets[0][0] if buckets and buckets[0] else "hub__s1"
-    kit = KIT_REL
+            out.append(f"\n### 咒语 — {ns}\n```\n{SPELL.format(ns=ns, kit=KIT_REL)}\n```")
+
+    egns = nss_of[people[0]][0] if people and nss_of[people[0]] else f"{repos[0]}__示例"
     out.append(
         "\n---\n\n## 提交步骤(给协作者)\n"
         "\n你只改自己命名空间的目录,所以和别人**不会冲突**。跑完后:\n"
         "\n```bash\n"
-        f"git switch -c work/你的名字           # 开自己的分支\n"
+        "git switch -c work/你的名字           # 开自己的分支\n"
         f"# 只 add 你负责的命名空间目录(每个 ns 三处),例如 {egns}:\n"
-        f"git add {kit}/work/{egns} {kit}/evidence/{egns} {kit}/notes/{egns}\n"
+        f"git add {KIT_REL}/work/{egns} {KIT_REL}/evidence/{egns} {KIT_REL}/notes/{egns}\n"
         f"git commit -m \"分析 {egns}\"\n"
-        f"git push -u origin work/你的名字       # 然后在 GitHub 上发 PR\n"
+        "git push -u origin work/你的名字       # 然后在 GitHub 上发 PR\n"
         "```\n"
         "\n> 注意:**不要** `git add .`,以免带上别人的改动或本地源码;只 add 自己那几个 ns 目录。\n"
         "> 被分析的源码不要提交进本仓库。"
@@ -308,10 +328,9 @@ def cmd_assign(repos_csv, people):
     path_out = os.path.join(KIT, "ASSIGNMENTS.md")
     open(path_out, "w", encoding="utf-8").write("\n".join(out) + "\n")
     print(f"分配表写入 {path_out}")
-    for pi in range(people):
-        if buckets[pi]:
-            print(f"  第 {pi + 1} 人:{', '.join(buckets[pi])}  "
-                  f"(TODO 合计 {sum(_todo_of(ns) for ns in buckets[pi])})")
+    for p in people:
+        if nss_of[p]:
+            print(f"  {p}:{', '.join(nss_of[p])}  (TODO 合计 {sum(_todo_of(ns) for ns in nss_of[p])})")
 
 
 def cmd_clean(repo):
@@ -332,19 +351,28 @@ def main():
         p = sub.add_parser(name)
         p.add_argument("--repo", required=True)
         if name == "split":
-            p.add_argument("--shards", type=int, default=5)
+            p.add_argument("--names", help="逗号分隔的人名,按 PROGRESS 顺序连续分给他们(命名空间=<repo>__<人名>)")
+            p.add_argument("--shards", type=int, help="或:不按人名,均分成 N 段(命名空间=<repo>__sK)")
         if name == "merge":
             p.add_argument("--dry-run", action="store_true", help="只预览汇总结果,不写任何文件")
     pa = sub.add_parser("assign")
     pa.add_argument("--repos", required=True, help="逗号分隔,如 hub,mca")
-    pa.add_argument("--people", type=int, required=True)
     args = ap.parse_args()
 
     if args.cmd == "split":
-        if args.shards < 1:
-            sys.exit("--shards 至少 1")
-        print(f"切分 {args.repo} → {args.shards} 片:")
-        cmd_split(args.repo, args.shards)
+        if args.names:
+            names = [n.strip() for n in args.names.split(",") if n.strip()]
+            if not names:
+                sys.exit("--names 不能为空")
+            print(f"切分 {args.repo} → 按 PROGRESS 顺序连续分给 {len(names)} 人:")
+            cmd_split(args.repo, names=names)
+        elif args.shards:
+            if args.shards < 1:
+                sys.exit("--shards 至少 1")
+            print(f"切分 {args.repo} → 顺序均分成 {args.shards} 段:")
+            cmd_split(args.repo, shards=args.shards)
+        else:
+            sys.exit("二选一:--names 张三,李四,…  或  --shards N")
     elif args.cmd == "status":
         cmd_status(args.repo)
     elif args.cmd == "merge":
@@ -352,9 +380,7 @@ def main():
     elif args.cmd == "clean":
         cmd_clean(args.repo)
     elif args.cmd == "assign":
-        if args.people < 1:
-            sys.exit("--people 至少 1")
-        cmd_assign(args.repos, args.people)
+        cmd_assign(args.repos)
 
 
 if __name__ == "__main__":

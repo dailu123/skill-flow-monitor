@@ -18,15 +18,18 @@
 ### 维护者(一次性)
 
 ```bash
-# 1) 切片(按"文件数"均衡):hub 2000 → 10 片,mca 1000 → 10 片
-python code-analysis-kit/parallel/shard.py split --repo hub --shards 10
-python code-analysis-kit/parallel/shard.py split --repo mca --shards 10
+# 1) 按人名切片(按 PROGRESS 顺序连续分,命名空间=<repo>__<人名>)
+python code-analysis-kit/parallel/shard.py split --repo hub --names 张三,李四,王五,赵六,钱七,孙八,周九,吴十,郑一,王二
+python code-analysis-kit/parallel/shard.py split --repo mca --names 张三,李四,王五,赵六,钱七,孙八,周九,吴十,郑一,王二
 
-# 2) 分配 + 生成每人可复制的「咒语」→ 写出 code-analysis-kit/ASSIGNMENTS.md
-python code-analysis-kit/parallel/shard.py assign --repos hub,mca --people 10
+# 2) 分配 + 生成每人可复制的「咒语」→ 写出 code-analysis-kit/ASSIGNMENTS.md(按人名归组)
+python code-analysis-kit/parallel/shard.py assign --repos hub,mca
 
 # 把分片目录、shards.json、ASSIGNMENTS.md 提交推送
 ```
+
+> 切法:**按 PROGRESS 表里的顺序连续切**,每人拿到一段(行数尽量均匀;不重排、不按文件数均衡)。
+> 想匿名/不按人名也行:用 `--shards N` 切成 `<repo>__s1..sN`,`assign` 同样会按 s1..sN 归组。
 
 ### 每个人
 
