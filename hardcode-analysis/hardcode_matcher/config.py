@@ -31,8 +31,14 @@ FIELD_NAMES = [
     "??GMAB",   # 2 variable prefix chars + GMAB; add aliases here if SYSCOLUMNS shows any
 ]
 
-# === EBCDIC CCSID: 037 (US / default) or others. Python codec name. ===
-# 037 -> 'cp037'. 1388 (host GBK) has no built-in Python codec; needs a custom map.
+# === EBCDIC CCSID: Python codec name used (a) to decode raw EBCDIC files and (b) to build
+# the X'..' hex keyword table. ===
+# HUB source is CCSID 937 (Traditional Chinese host). Python has no cp937 codec, but the 15
+# GMAB codes are uppercase Latin letters, which are INVARIANT across EBCDIC code pages, so
+# cp037 produces the same bytes (HBCB -> X'C8C2C3C2') and the hex check is unaffected.
+# Raw-937 source still decodes its SBCS letters correctly under cp037 (only DBCS Chinese,
+# which never appears in a GMAB value, would garble). Leave cp037 unless a value contains
+# non-invariant characters.
 EBCDIC_CODEC = "cp037"
 
 # String delimiters (single quote is universal across RPG/COBOL/CL/SQL;

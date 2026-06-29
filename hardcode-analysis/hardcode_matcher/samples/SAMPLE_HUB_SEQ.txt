@@ -10,3 +10,5 @@
 001000250811     C                   IF        L1GMAB = X'C8C2C3C2'
 001100250811     C                   IF        L1GMAB = 'HBGD'
 001200250811     C                   EVAL      s2acno = %trim(s2ctcd) + ' ' + %trim(s2gmab) + '-' + %editc(s2acb:'X')
+001300250811     C                   MOVE      BFGMAB        AGGMAB
+001400250811     C                   Z-ADD     1             W3SFRC
