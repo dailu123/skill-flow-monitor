@@ -73,4 +73,6 @@ if __name__ == "__main__":
     show_hits(os.path.join(HERE, "SAMPLE_MIXED.txt"), custom)
     show_literals(os.path.join(HERE, "SAMPLE_HUB_SEQ.txt"))
     show_hits(os.path.join(HERE, "SAMPLE_HUB_SEQ.txt"), custom)
+    show_literals(os.path.join(HERE, "SAMPLE_HUB_FREE.txt"))
+    show_hits(os.path.join(HERE, "SAMPLE_HUB_FREE.txt"), custom)
     ebcdic_roundtrip_test()

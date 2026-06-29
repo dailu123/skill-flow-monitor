@@ -1,0 +1,9 @@
+10491H* AMENDED BY YUKI PENG -- value 'HBCB' in this header comment must be ignored
+**FREE
+// declear used constants variables
+dcl-c w0ctcd    const('CN');
+dcl-c W0gmab    const('HSBC');
+// comment mentioning HBCB must be ignored
+if W0gmab = 'HBCB';
+  route = W0gmab;
+endif;

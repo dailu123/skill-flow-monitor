@@ -24,6 +24,7 @@ e.g. `L1GMAB`, `K7GMAB`).
 |---|---------|---------|
 | 1 | The group member field is **compared** to a fixed value | `IF L1GMAB = 'HBCB'` |
 | 2 | A fixed value is **assigned** to the group member field | `MOVE 'HSBC' K7GMAB` / `EVAL L1GMAB = 'HBCB'` |
+| 2b | A fixed value is **defined as a named constant / field default** named like the field | `dcl-c W0gmab const('HSBC')` |
 | 3 | **Part of** the field is compared to a fixed value (prefix/truncation) | `%SUBST(L1GMAB:1:2) = 'HB'` |
 | 4 | The value is written in **hexadecimal** (same value, different form) | `IF L1GMAB = X'C8C2C3C2'`  (= `HBCB`) |
 | 5 | One of the 15 values appears as a **literal anywhere**, even without the field nearby | `MOVE 'HBCB' WRKFLD` |

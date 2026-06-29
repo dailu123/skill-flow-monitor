@@ -71,16 +71,18 @@ def strip_comments(lines, prefix=0):
     return out
 
 
-def _is_fixed_comment(line, prefix=0):
-    col = prefix + config.FIXED_COMMENT_COL
-    if len(line) < col:
-        return False
-    if line[col - 1] not in ("*", "/"):
-        return False
-    for ch in line[prefix:prefix + 5]:
-        if not (ch == " " or ch.isdigit()):
-            return False
-    return True
+# Mirror of literal_extractor: leading digits/spaces + RPG form-type letter + '*'/'/'
+# (any prefix width), or a no-prefix bare '*'/'/' in column 7 (COBOL).
+_FIXED_COMMENT_RE = re.compile(r"(?i)^[0-9 ]*[HFDICOPJ][*/]")
+
+
+def _is_fixed_comment(line, prefix=0):  # prefix kept for signature compatibility (unused)
+    if _FIXED_COMMENT_RE.match(line):
+        return True
+    if len(line) >= config.FIXED_COMMENT_COL and line[config.FIXED_COMMENT_COL - 1] in ("*", "/"):
+        if all(ch == " " or ch.isdigit() for ch in line[:5]):
+            return True
+    return False
 
 
 # ---------- field token detection ----------
@@ -128,10 +130,12 @@ def has_field(text, field_re):
 #   EVAL s2acno = %trim(s2gmab) + '-' + ...     -> '+' between s2gmab,'-'  -> NOT bound
 _CONNECTOR = re.compile(r"\b(?:AND|OR)\b", re.IGNORECASE)
 _BTOKEN = re.compile(r"[A-Za-z%@#$][A-Za-z0-9%@#$_.]*|<=|>=|<>|[-=<>+*/,();:]|'|\"|\d+")
-# fixed-form traditional comparison/assignment word operators allowed as binding glue
+# Binding-glue words: fixed-form comparison/assignment operators, plus CONST/INZ so a named
+# constant or initialized field declaration counts (dcl-c W0gmab const('HSBC')).
 _RELOP_WORDS = {"EQ", "NE", "NEQ", "LT", "GT", "LE", "GE", "COMP",
                 "IFEQ", "IFNE", "IFGT", "IFLT", "IFGE", "IFLE",
-                "DOWEQ", "DOWNE", "DOUEQ", "WHENEQ", "CABEQ", "ANDEQ", "OREQ"}
+                "DOWEQ", "DOWNE", "DOUEQ", "WHENEQ", "CABEQ", "ANDEQ", "OREQ",
+                "CONST", "INZ"}
 
 
 def _between_ok(between):

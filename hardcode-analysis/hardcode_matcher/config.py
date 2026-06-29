@@ -55,7 +55,8 @@ BLOCK_COMMENT_CLOSE = "*/"
 IDENT_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@#$")
 
 # Context lines around a hit (the `statement` column shows +/- this many lines).
-CONTEXT_LINES = 2
+# 0 = show only the matched line.
+CONTEXT_LINES = 0
 
 # Optional path to a JSON file with extra, user-supplied detection patterns.
 # Set at run time via --patterns, or leave None to use only the built-in anchors A/B.

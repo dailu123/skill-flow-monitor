@@ -15,6 +15,7 @@ Design (confirmed: encoding is mixed; do NOT dispatch lexer by file name):
   after decoding).
 """
 import os
+import re
 from . import config
 
 
@@ -115,19 +116,22 @@ def detect_seq_prefix(lines):
 
 
 # ---------- comment detection ----------
-def _is_fixed_comment_line(line, prefix=0):
-    """Fixed-form comment: form-type column ('*' or '/' in column 7 of the source data),
-    with the 5-char sequence area before it blank/digit. `prefix` accounts for the 12-char
-    SEU seq+date prefix so the marker is checked at its real (shifted) column."""
-    col = prefix + config.FIXED_COMMENT_COL      # column 7 of the source data
-    if len(line) < col:
-        return False
-    if line[col - 1] not in ("*", "/"):
-        return False
-    for ch in line[prefix:prefix + 5]:           # source-data columns 1-5
-        if not (ch == " " or ch.isdigit()):
-            return False
-    return True
+# Robust against any sequence-number/date prefix width: a fixed-form comment is a run of
+# leading digits/spaces (the seq + optional date area), then an RPG form-type letter
+# (H/F/D/I/C/O/P/J) immediately followed by '*' or '/'. Works for '10491H*' (5-char prefix),
+# '54900000000017453C*' (12-char prefix), and '     C*' (no prefix) alike, and never matches
+# a free-form '*inlr' (no form-type letter before the '*').
+_FIXED_COMMENT_RE = re.compile(r"(?i)^[0-9 ]*[HFDICOPJ][*/]")
+
+
+def _is_fixed_comment_line(line, prefix=0):  # prefix kept for signature compatibility (unused)
+    if _FIXED_COMMENT_RE.match(line):
+        return True
+    # COBOL / no-prefix bare '*' or '/' in column 7
+    if len(line) >= config.FIXED_COMMENT_COL and line[config.FIXED_COMMENT_COL - 1] in ("*", "/"):
+        if all(ch == " " or ch.isdigit() for ch in line[:5]):
+            return True
+    return False
 
 
 # ---------- literal scanning ----------

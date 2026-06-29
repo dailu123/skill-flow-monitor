@@ -101,12 +101,12 @@ and the custom-pattern engine.
 
 ## Real-world IBM i source notes
 
-- **SEU seq+date prefix.** Members exported with the sequence number + change date carry a
-  12-char numeric prefix on every record (`000400250811     C ... IF L1GMAB = 'HBCB'`),
-  which shifts the fixed-form columns. The extractor auto-detects this (lines starting with
-  12 digits) and accounts for it so comments strip correctly; force it with
-  `config.SEQ_PREFIX_WIDTH`. Without this, an apostrophe in an unstripped comment
-  (e.g. `Customer's DCN`) would open a runaway string and hide the real values.
+- **SEU seq/date/change-id prefix (variable width).** Members carry a leading numeric prefix
+  on every record (`000400250811     C ...`, or a 5-digit change-id like `10491H*`), which
+  shifts the fixed-form columns. Comment detection is **prefix-width-independent**: a fixed
+  comment is `leading digits/spaces + RPG form-type letter + '*' or '/'`, so it works whatever
+  the prefix width and even when it varies between members. Without this, an apostrophe in an
+  unstripped comment (e.g. `Customer's DCN`) would open a runaway string and hide the values.
 - **Clause-level binding (precision).** Anchor B marks a literal as a GMAB hardcode only
   when it shares the same `AND`/`OR` clause as a GMAB field — so
   `IF (L1STUS='1') AND (L1GMAB<>W3GMAB)` and field-to-field comparisons are NOT reported,

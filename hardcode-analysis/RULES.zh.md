@@ -22,6 +22,7 @@ HUB 里 group member 字段名为 `??GMAB`(2 位可变字符 + `GMAB`,如 `L1GMA
 |---|------|------|
 | 1 | 把 group member 字段与一个**固定值比较** | `IF L1GMAB = 'HBCB'` |
 | 2 | 把**固定值赋给** group member 字段 | `MOVE 'HSBC' K7GMAB` / `EVAL L1GMAB = 'HBCB'` |
+| 2b | 把固定值**定义成与字段同名的命名常量 / 字段默认值** | `dcl-c W0gmab const('HSBC')` |
 | 3 | 取字段**一部分**与固定值比(前缀/截断) | `%SUBST(L1GMAB:1:2) = 'HB'` |
 | 4 | 用**十六进制**写死的同一个值(值相同、形式不同) | `IF L1GMAB = X'C8C2C3C2'`(= `HBCB`) |
 | 5 | 这 15 个值之一作为**字面量出现**(即使附近没有该字段) | `MOVE 'HBCB' WRKFLD` |
