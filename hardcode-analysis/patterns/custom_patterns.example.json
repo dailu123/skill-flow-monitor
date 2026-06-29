@@ -1,8 +1,8 @@
 [
   {
     "name": "routing_helper_call",
-    "description": "GMAB value passed to a chkGrpMbr()/getGrpRoute() style helper. This is a field-reference idiom the core field matcher cannot see (the field name is not in the statement), so it is added here as an experience-driven pattern.",
-    "regex": "(?i)(?:chkGrpMbr|getGrpRoute)\\(\\s*'(?P<value>H[A-Z0-9]{3})'",
+    "description": "GMAB value passed to a chkGmab()/getGmabRoute() style helper. This is a field-reference idiom the core field matcher cannot see (the column name is not in the statement), so it is added here as an experience-driven pattern.",
+    "regex": "(?i)(?:chkGmab|getGmabRoute)\\(\\s*'(?P<value>H[A-Z0-9]{3})'",
     "anchor": "B",
     "match_form": "ASCII",
     "confidence": "HIGH",
@@ -10,8 +10,8 @@
   },
   {
     "name": "prefix_compare_two_char",
-    "description": "Two-character prefix comparison against the group member, e.g. %SUBST(GRPMBR:1:2) = 'HB'. Captures the out-of-list prefix candidate for review.",
-    "regex": "(?i)%SUBST\\s*\\(\\s*GRPMBR\\s*:\\s*1\\s*:\\s*2\\s*\\)\\s*=\\s*'(?P<value>H[A-Z0-9])'",
+    "description": "Two-character prefix comparison against the group member column, e.g. %SUBST(bkGMAB:1:2) = 'HB'. The column name has a 2-char variable prefix, so the regex matches [A-Z0-9]{2}GMAB. Captures the out-of-list prefix candidate for review.",
+    "regex": "(?i)%SUBST\\s*\\(\\s*[A-Z0-9]{2}GMAB\\s*:\\s*1\\s*:\\s*2\\s*\\)\\s*=\\s*'(?P<value>H[A-Z0-9])'",
     "anchor": "B",
     "match_form": "ASCII",
     "confidence": "HIGH",

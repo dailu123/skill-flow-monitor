@@ -22,10 +22,13 @@ GMAB_VALUES = [
 HSBC_VALUE = "HSBC"
 
 # === Real column name(s) of the group member field (there may be aliases). ===
-# !!! Fill in AFTER the precheck (QSYS2.SYSCOLUMNS + DISTINCT on the real table). !!!
-# Case-insensitive, matched on token boundaries (so GRPMBR_FLAG is NOT a false hit).
+# Confirm via the precheck (QSYS2.SYSCOLUMNS + DISTINCT on the real table).
+# Case-insensitive, matched on token boundaries (so xxGMAB_FLAG is NOT a false hit).
+# Wildcards are supported for variable-prefix names:
+#   '?' = exactly one identifier char,  '*' = zero or more.
+# In HUB the group member column is named "<2 variable chars>GMAB", so use "??GMAB".
 FIELD_NAMES = [
-    "GRPMBR",   # placeholder: replace/extend with the actual column name(s) per SYSCOLUMNS
+    "??GMAB",   # 2 variable prefix chars + GMAB; add aliases here if SYSCOLUMNS shows any
 ]
 
 # === EBCDIC CCSID: 037 (US / default) or others. Python codec name. ===

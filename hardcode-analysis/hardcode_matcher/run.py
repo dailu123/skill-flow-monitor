@@ -59,7 +59,9 @@ def main(argv=None):
     ap.add_argument("--src", required=True, help="source root directory")
     ap.add_argument("--out", default="gmab_out", help="output directory")
     ap.add_argument("--fields", default=",".join(config.FIELD_NAMES),
-                    help="real group member column name(s), comma-separated")
+                    help="group member column name(s), comma-separated. Wildcards: "
+                         "'?'=one char, '*'=many. HUB uses a 2-char variable prefix, "
+                         "so '??GMAB'.")
     ap.add_argument("--ccsid", default=config.EBCDIC_CODEC,
                     help="EBCDIC codec (default cp037)")
     ap.add_argument("--patterns", default=config.CUSTOM_PATTERNS_PATH,

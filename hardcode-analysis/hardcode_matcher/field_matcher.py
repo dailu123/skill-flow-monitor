@@ -77,11 +77,29 @@ def _is_fixed_comment(line):
 
 
 # ---------- field token detection ----------
+def _field_alt(name, idents_cls):
+    """Translate one field-name spec into a regex fragment.
+    Wildcards (for variable-prefix column names like the HUB '??GMAB'):
+      '?' = exactly one identifier char   -> e.g. '??GMAB' = 2 free chars + GMAB
+      '*' = zero or more identifier chars
+    Everything else is matched literally (re.escaped)."""
+    out = []
+    for ch in name:
+        if ch == "?":
+            out.append("[" + idents_cls + "]")
+        elif ch == "*":
+            out.append("[" + idents_cls + "]*")
+        else:
+            out.append(re.escape(ch))
+    return "".join(out)
+
+
 def field_regex(field_names):
     """Token-boundary match (avoids GRPMBR_FLAG / X_GRPMBR false hits) via negative
-    lookbehind/lookahead on the identifier char set (fixed width, safe)."""
+    lookbehind/lookahead on the identifier char set (fixed width, safe).
+    Supports '?'/'*' wildcards so a variable-prefix column name like '??GMAB' works."""
     idents = re.escape("".join(sorted(config.IDENT_CHARS)))
-    alt = "|".join(re.escape(f) for f in field_names)
+    alt = "|".join(_field_alt(f, idents) for f in field_names)
     pat = "(?<![" + idents + "])(?:" + alt + ")(?![" + idents + "])"
     return re.compile(pat, re.IGNORECASE)
 

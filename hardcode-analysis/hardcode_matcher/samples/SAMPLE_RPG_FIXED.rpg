@@ -1,13 +1,13 @@
      H* Copyright HSBC 2024 -- this is a column-7 fixed comment; HBCB here must be dropped
-     F* GRPMBR field note: group member; real code starts below
+     F* bkGMAB field note: group member; real code starts below
      C* Ordinary comment line: HAAA appears in a comment, must NOT hit
-     C                   IF        GRPMBR = 'HBCB'
+     C                   IF        bkGMAB = 'HBCB'
      C                   EVAL      WRK = 'HBCD'
-     C                   IF        %SUBST(GRPMBR:1:2) = 'HB'
-     C                   MOVE      'HSBC'        GRPMBR
+     C                   IF        %SUBST(bkGMAB:1:2) = 'HB'
+     C                   MOVE      'HSBC'        bkGMAB
      C                   EVAL      OTHERFLD = 'HSBC'
      C                   EVAL      MSG = 'It''s a test HBCF inside quotes'
-     C                   IF        GRPMBR = X'C8C2C3C2'
-     D  GRPMBR_FLAG      S              1A   INZ('Y')
+     C                   IF        bkGMAB = X'C8C2C3C2'
+     D  bkGMAB_FLAG      S              1A   INZ('Y')
      C                   EVAL      ROUTE = 'HSBC0123'
-     C                   CALLP     chkGrpMbr('HBGD')
+     C                   CALLP     chkGmab('HBGD')

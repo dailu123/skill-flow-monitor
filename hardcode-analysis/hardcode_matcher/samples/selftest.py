@@ -51,8 +51,8 @@ def show_hex_table():
 
 
 def ebcdic_roundtrip_test():
-    src = ("     C                   IF        GRPMBR = 'HBCB'\n"
-           "     C                   IF        GRPMBR = X'C8C2C3C2'\n")
+    src = ("     C                   IF        bkGMAB = 'HBCB'\n"
+           "     C                   IF        bkGMAB = X'C8C2C3C2'\n")
     data = src.encode(config.EBCDIC_CODEC)
     p = os.path.join(HERE, "_ebcdic_tmp.bin")
     with open(p, "wb") as f:

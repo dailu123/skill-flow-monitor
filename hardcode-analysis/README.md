@@ -51,14 +51,25 @@ not reproducible, risks missing lines, and its cost scales with code size. Recal
 
 ```
 python -m hardcode_matcher.run --src <HUB source root> --out gmab_out \
-    --fields GRPMBR,GRPMBRALT --ccsid cp037 \
+    --fields "??GMAB" --ccsid cp037 \
     --patterns patterns/custom_patterns.example.json
 ```
 
-- `--src` should point at **HUB source only** (do not mix in this tool or other-language
-  files, or you will extract unrelated literals).
-- `--exts` optionally restricts extensions; default scans everything.
-- `--patterns` is optional; omit it to use only anchors A/B.
+Argument meaning:
+
+- `--src` — source root to scan (recursive, all files, no file-name dispatch). Point it at
+  **HUB source only** (do not mix in this tool or other-language files, or you will extract
+  unrelated literals).
+- `--out` — output directory for `gmab_hits.csv` + `gmab_summary.md`.
+- `--fields` — the group member **column name(s)**, comma-separated, used for anchor B
+  (field adjacency). Supports wildcards: `?` = one identifier char, `*` = many. In HUB the
+  column has a **2-char variable prefix**, so use `"??GMAB"` (matches `01GMAB`, `bkGMAB`,
+  …, but not bare `GMAB`, a 3-char prefix, or `xxGMAB_FLAG`).
+- `--ccsid` — EBCDIC codec (default `cp037` = CCSID 037). Used both to decode raw EBCDIC
+  source and to compute each value's EBCDIC bytes for the `X'..'` hex form. Change it if the
+  host CCSID differs (e.g. 1388 — see Known boundaries).
+- `--exts` — optional extension filter; default scans everything.
+- `--patterns` — optional custom-pattern JSON; omit to use only anchors A/B.
 
 ## Output columns
 
