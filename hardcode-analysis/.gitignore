@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+gmab_out/
+*_tmp.bin

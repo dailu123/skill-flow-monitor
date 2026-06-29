@@ -1,0 +1,14 @@
+**FREE
+// free RPGLE comment; HAAA inside a comment must NOT hit
+DCL-S grpmbr CHAR(4);
+IF grpmbr = 'HBGD';   // inline comment also has HBHT, must NOT hit
+  route = 'HBFU';
+ENDIF;
+EXEC SQL
+  SELECT * FROM TBL
+  WHERE GRPMBR = 'HBHU'   -- SQL comment HBMC must NOT hit
+    AND STATUS = 'HBSD';
+/* CL block comment starts, HBCQ must NOT hit
+   still inside the block, HBDP must NOT hit */
+CHGVAR &X VALUE('HBSH')
+MONMSG  MSGID('HSBC9999')

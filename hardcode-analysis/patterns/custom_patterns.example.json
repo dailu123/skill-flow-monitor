@@ -1,0 +1,20 @@
+[
+  {
+    "name": "routing_helper_call",
+    "description": "GMAB value passed to a chkGrpMbr()/getGrpRoute() style helper. This is a field-reference idiom the core field matcher cannot see (the field name is not in the statement), so it is added here as an experience-driven pattern.",
+    "regex": "(?i)(?:chkGrpMbr|getGrpRoute)\\(\\s*'(?P<value>H[A-Z0-9]{3})'",
+    "anchor": "B",
+    "match_form": "ASCII",
+    "confidence": "HIGH",
+    "lang": "any"
+  },
+  {
+    "name": "prefix_compare_two_char",
+    "description": "Two-character prefix comparison against the group member, e.g. %SUBST(GRPMBR:1:2) = 'HB'. Captures the out-of-list prefix candidate for review.",
+    "regex": "(?i)%SUBST\\s*\\(\\s*GRPMBR\\s*:\\s*1\\s*:\\s*2\\s*\\)\\s*=\\s*'(?P<value>H[A-Z0-9])'",
+    "anchor": "B",
+    "match_form": "ASCII",
+    "confidence": "HIGH",
+    "lang": "any"
+  }
+]
