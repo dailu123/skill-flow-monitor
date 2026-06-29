@@ -88,16 +88,43 @@ def guess_lang(text):
     return "RPG"   # fixed-form fallback
 
 
+# ---------- sequence-number prefix (SEU seq 6 + date 6 = 12 chars) ----------
+def detect_seq_prefix(lines):
+    """IBM i source exported with the SEU sequence number + change date keeps a 12-char
+    numeric prefix on every record (e.g. '202900000000D...'). That shifts the fixed-form
+    RPG columns right by 12 (comment '*' lands in physical column 19, not 7), so it must be
+    detected and accounted for. Returns the prefix width (0 or 12).
+    Override with config.SEQ_PREFIX_WIDTH (int) to force a value."""
+    if getattr(config, "SEQ_PREFIX_WIDTH", None) is not None:
+        return config.SEQ_PREFIX_WIDTH
+    import re
+    pat = re.compile(r"^\d{12}")
+    sampled = 0
+    hits = 0
+    for ln in lines:
+        if not ln.strip():
+            continue
+        sampled += 1
+        if pat.match(ln):
+            hits += 1
+        if sampled >= 200:
+            break
+    if sampled >= 5 and hits >= sampled * 0.6:
+        return 12
+    return 0
+
+
 # ---------- comment detection ----------
-def _is_fixed_comment_line(line):
-    """Fixed-form: column 7 '*' or '/', with columns 1-5 blank/digit (sequence area)."""
-    col = config.FIXED_COMMENT_COL
+def _is_fixed_comment_line(line, prefix=0):
+    """Fixed-form comment: form-type column ('*' or '/' in column 7 of the source data),
+    with the 5-char sequence area before it blank/digit. `prefix` accounts for the 12-char
+    SEU seq+date prefix so the marker is checked at its real (shifted) column."""
+    col = prefix + config.FIXED_COMMENT_COL      # column 7 of the source data
     if len(line) < col:
         return False
-    marker = line[col - 1]
-    if marker not in ("*", "/"):
+    if line[col - 1] not in ("*", "/"):
         return False
-    for ch in line[:5]:
+    for ch in line[prefix:prefix + 5]:           # source-data columns 1-5
         if not (ch == " " or ch.isdigit()):
             return False
     return True
@@ -109,6 +136,7 @@ def extract_from_text(text, path, member, lang=None):
     if lang is None:
         lang = guess_lang(text)
     lines = text.split("\n")
+    prefix = detect_seq_prefix(lines)
     out = []
 
     in_block_comment = False     # CL /* */ across lines
@@ -122,7 +150,7 @@ def extract_from_text(text, path, member, lang=None):
 
     for li, raw_line in enumerate(lines, start=1):
         # Full-line fixed-form comment, but only when not in the middle of a string.
-        if not in_string and not in_block_comment and _is_fixed_comment_line(raw_line):
+        if not in_string and not in_block_comment and _is_fixed_comment_line(raw_line, prefix):
             continue
 
         i = 0
@@ -184,10 +212,16 @@ def extract_from_text(text, path, member, lang=None):
                 continue
             i += 1
 
-        # End of line: if still inside a string, treat as continuation (safety net).
+        # End of line while still inside a string: in fixed/free RPG, COBOL, CL and SQL a
+        # quoted literal does not span physical lines without an explicit continuation, and
+        # GMAB values are only 4 chars. So CLOSE the string at end of line rather than
+        # merging into the next one -- this prevents a stray apostrophe (e.g. in an
+        # unstripped "Customer's DCN" comment) from swallowing the rest of the file.
         if in_string:
-            str_chars.append("\n")
-            str_raw.append("\n")
+            in_string = False
+            str_is_hex = False
+            str_chars = []
+            str_raw = []
 
     return out
 

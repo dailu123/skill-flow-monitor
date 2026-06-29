@@ -30,9 +30,10 @@ def process_file(path, field_names, ccsid, custom_patterns=None):
     text, enc = literal_extractor.decode_file(path, ccsid)
     member = os.path.basename(path)
     lines = text.split("\n")
+    prefix = literal_extractor.detect_seq_prefix(lines)
     lits = literal_extractor.extract_from_text(text, path, member)
     lang = literal_extractor.guess_lang(text)
-    adj, line_adjacent = field_matcher.annotate_file(lines, lits, field_names)
+    adj, bound_fn = field_matcher.annotate_file(lines, lits, field_names, prefix)
 
     def ctx_fn(lit, line=None, _lines=lines):
         ln = line if line is not None else lit.line
@@ -44,12 +45,12 @@ def process_file(path, field_names, ccsid, custom_patterns=None):
 
     pat_hits = None
     if custom_patterns:
-        code_lines = field_matcher.strip_comments(lines)
+        code_lines = field_matcher.strip_comments(lines, prefix)
         pat_hits = patmod.apply_patterns(code_lines, custom_patterns, lang)
 
     hits = merge_dedup.make_hits(vhits, lits, adj, ctx_fn,
                                  pattern_hits=pat_hits,
-                                 line_adjacent=line_adjacent,
+                                 bound_fn=bound_fn,
                                  member=member, lang=lang)
     return hits, enc
 

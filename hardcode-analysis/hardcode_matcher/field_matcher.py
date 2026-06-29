@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Anchor B: field-reference matching (constraint 4) + field-adjacency for confidence
+Anchor B: field-reference matching (constraint 4) + field binding for confidence
 (constraint 6) + HSBC downgrade (constraint 5).
 
-- field_adjacent(lit): does the literal's logical statement reference the group member
-  field (real column name)?
+- A literal binds to the group member field only when it shares the SAME comparison/
+  assignment CLAUSE as a GMAB field token (split on AND/OR), not merely the same statement.
+  This rejects compound-statement coincidences such as
+  `IF (L1STUS='1') AND (L1GMAB<>W3GMAB)` (the '1' is bound to L1STUS, not GMAB) and
+  field-to-field comparisons, while keeping `IF L1GMAB='HBCB'`, `MOVE 'HSBC' K7GMAB`,
+  and `%SUBST(L1GMAB:1:2)='HB'`.
 - DSPPGMREF only reaches object level; field-level cross-reference must come from a
   source scan, i.e. this module.
 """
@@ -13,15 +17,16 @@ from . import config
 
 
 # ---------- comment stripping (keep strings, so field-name tokens stay searchable) ----------
-def strip_comments(lines):
+def strip_comments(lines, prefix=0):
     """Return code-only lines (comments blanked, string contents kept), same length as
-    input. Reuses the same comment/string rules as literal_extractor for consistency."""
+    input. Reuses the same comment/string rules as literal_extractor for consistency.
+    `prefix` is the SEU seq+date prefix width (see literal_extractor.detect_seq_prefix)."""
     out = []
     in_block = False
     in_string = False
     q = ""
     for raw in lines:
-        if not in_string and not in_block and _is_fixed_comment(raw):
+        if not in_string and not in_block and _is_fixed_comment(raw, prefix):
             out.append("")
             continue
         buf = []
@@ -61,16 +66,18 @@ def strip_comments(lines):
             buf.append(ch)
             i += 1
         out.append("".join(buf))
+        in_string = False   # strings do not span physical lines (see literal_extractor)
+        q = ""
     return out
 
 
-def _is_fixed_comment(line):
-    col = config.FIXED_COMMENT_COL
+def _is_fixed_comment(line, prefix=0):
+    col = prefix + config.FIXED_COMMENT_COL
     if len(line) < col:
         return False
     if line[col - 1] not in ("*", "/"):
         return False
-    for ch in line[:5]:
+    for ch in line[prefix:prefix + 5]:
         if not (ch == " " or ch.isdigit()):
             return False
     return True
@@ -108,60 +115,53 @@ def has_field(text, field_re):
     return field_re.search(text) is not None
 
 
-# ---------- logical statement segmentation (SQL block to ; / free continuation / fixed per line) ----------
-def segment_statements(code_lines):
-    """Assign a stmt_id to each line (0-based). Rules (by content, not file name):
-    - EXEC SQL ... ;  -> the whole block is one statement (so a multi-line WHERE/SET keeps
-      GRPMBR and the value in the same statement).
-    - free/SQL continuation: a line ending in + / - / , continues into the next line.
-    - everything else (fixed-form RPG C-spec, single-line free statement): one stmt/line.
-    - blank line: a boundary.
-    """
-    ids = [0] * len(code_lines)
-    sid = 0
-    in_sql = False
-    for i, raw in enumerate(code_lines):
-        ids[i] = sid
-        s = raw.strip()
-        up = s.upper()
-        if in_sql:
-            if ";" in s:
-                in_sql = False
-                sid += 1
-            continue
-        if s == "":
-            sid += 1
-            continue
-        if "EXEC SQL" in up and ";" not in s:
-            in_sql = True
-            continue
-        if s.endswith(("+", "-", ",")):
-            continue
-        sid += 1
-    return ids
+# ---------- clause-level binding (precision: literal must bind to the GMAB field) ----------
+# A literal counts as a GMAB hardcode only when it sits in the SAME comparison/assignment
+# clause as a GMAB field -- not merely the same statement. Splitting on the boolean
+# connectors AND/OR isolates each comparison, so:
+#   IF L1GMAB = 'HBCB'                         -> '1' clause has GMAB  -> bound (HIGH)
+#   MOVE 'HSBC' K7GMAB                          -> one clause has GMAB  -> bound (HIGH)
+#   %SUBST(L1GMAB:1:2) = 'HB'                   -> one clause has GMAB  -> bound (HIGH)
+#   IF (L1STUS='1') AND (L1GMAB<>W3GMAB)        -> '1' clause = (L1STUS='1'), no GMAB -> NOT bound
+#   WHERE GMAB='HBHU' ... AND STATUS='HBSD'     -> 'HBSD' clause has no GMAB -> NOT bound
+_CONNECTOR = re.compile(r"\b(?:AND|OR)\b", re.IGNORECASE)
+
+
+def clause_bound(code_line, col, field_re):
+    """True if the literal whose opening quote is at 1-based `col` shares its AND/OR clause
+    with a GMAB field token."""
+    if not code_line:
+        return False
+    idx = col - 1
+    last = 0
+    clauses = []
+    for m in _CONNECTOR.finditer(code_line):
+        clauses.append((last, m.start()))
+        last = m.end()
+    clauses.append((last, len(code_line)))
+    for s, e in clauses:
+        if s <= idx < e:
+            return field_re.search(code_line[s:e]) is not None
+    return field_re.search(code_line) is not None   # idx on a boundary: fall back to line
 
 
 # ---------- main entry (per file) ----------
-def annotate_file(lines, literals, field_names=None):
-    """Mark field_adjacent for each literal of this file.
-    Returns (adj_map, line_adjacent):
+def annotate_file(lines, literals, field_names=None, prefix=0):
+    """Mark field_adjacent (clause-bound) for each literal of this file.
+    Returns (adj_map, bound_fn):
       adj_map[id(lit)] = bool
-      line_adjacent[i] = bool for 0-based line i (used for custom-pattern hits)."""
+      bound_fn(line_1based, col_1based) -> bool   (for custom-pattern hits)."""
     field_names = field_names or config.FIELD_NAMES
     field_re = field_regex(field_names)
-    code_lines = strip_comments(lines)
-    stmt_ids = segment_statements(code_lines)
+    code_lines = strip_comments(lines, prefix)
 
-    # Which statement ids reference the field.
-    field_stmts = set()
-    for i, cl in enumerate(code_lines):
-        if cl and has_field(cl, field_re):
-            field_stmts.add(stmt_ids[i])
-
-    line_adjacent = [sid in field_stmts for sid in stmt_ids]
+    def bound_fn(line, col):
+        idx = line - 1
+        if 0 <= idx < len(code_lines):
+            return clause_bound(code_lines[idx], col, field_re)
+        return False
 
     adj = {}
     for lit in literals:
-        idx = lit.line - 1
-        adj[id(lit)] = line_adjacent[idx] if 0 <= idx < len(line_adjacent) else False
-    return adj, line_adjacent
+        adj[id(lit)] = bound_fn(lit.line, lit.col)
+    return adj, bound_fn

@@ -52,14 +52,14 @@ def _resolve_conf(declared, field_adjacent):
 
 
 def make_hits(value_hits, literals, adj_map, ctx_fn,
-              pattern_hits=None, line_adjacent=None, member=None, lang="any"):
+              pattern_hits=None, bound_fn=None, member=None, lang="any"):
     """
     value_hits:    anchor A (ValueHit list)
     literals:      all literals (for the anchor-B scan)
-    adj_map:       field_adjacent per literal (by id(lit))
+    adj_map:       field_adjacent (clause-bound) per literal (by id(lit))
     ctx_fn:        lit -> statement string (with +/- CONTEXT_LINES of context)
     pattern_hits:  optional list of patterns.PatternHit for this member
-    line_adjacent: optional per-line adjacency (0-based) for pattern hits
+    bound_fn:      optional (line, col) -> bool clause-binding test for pattern hits
     member/lang:   used for pattern hits (no Literal to read them from)
     """
     gmab_set = set(config.GMAB_VALUES)
@@ -104,9 +104,7 @@ def make_hits(value_hits, literals, adj_map, ctx_fn,
         member = member or (literals[0].member if literals else "")
         prog = _program_of_member(member)
         for ph in pattern_hits:
-            fa = False
-            if line_adjacent is not None and 0 <= ph.line - 1 < len(line_adjacent):
-                fa = line_adjacent[ph.line - 1]
+            fa = bound_fn(ph.line, ph.col) if bound_fn is not None else False
             if ph.value == config.HSBC_VALUE and not fa:   # HSBC downgrade applies too
                 continue
             conf = _resolve_conf(ph.confidence, fa)

@@ -54,3 +54,8 @@ CONTEXT_LINES = 2
 # Optional path to a JSON file with extra, user-supplied detection patterns.
 # Set at run time via --patterns, or leave None to use only the built-in anchors A/B.
 CUSTOM_PATTERNS_PATH = None
+
+# SEU sequence-number + date prefix width. IBM i source exported with seq+date keeps a
+# 12-char numeric prefix on every record, which shifts the fixed-form columns. None = auto
+# detect per file (lines starting with 12 digits); set an int to force (e.g. 0 or 12).
+SEQ_PREFIX_WIDTH = None

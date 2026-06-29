@@ -80,6 +80,17 @@ python -m hardcode_matcher.samples.selftest
 EBCDIC 文件解码、`X'C8C2C3C2'`→HBCB hex 命中、`%SUBST(GRPMBR:1:2)='HB'` 前缀入锚点 B、
 HSBC 贴字段保留/不贴丢弃、`GRPMBR_FLAG` 不算字段、以及自定义模式引擎。
 
+## 真实 IBM i 源码注意事项
+
+- **SEU 行号+日期前缀**：带 seq+date 导出的 member 每行有 12 位数字前缀
+  (`000400250811     C ... IF L1GMAB = 'HBCB'`)，会把定长列整体右移。提取器自动探测
+  (行首 12 位数字)并据此对齐,使注释正确剔除;可用 `config.SEQ_PREFIX_WIDTH` 强制。
+  否则注释里的撇号(如 `Customer's DCN`)会开一个跨行字符串、把真实值吞掉。
+- **子句级绑定(精度)**：锚点 B 只在字面量与 GMAB 字段处于**同一个 `AND`/`OR` 比较子句**
+  时才判为硬编码——所以 `IF (L1STUS='1') AND (L1GMAB<>W3GMAB)` 和字段间比较**不会**误报,
+  而 `IF L1GMAB='HBCB'`、`MOVE 'HSBC' K7GMAB`、`%SUBST(L1GMAB:1:2)='HB'` 会保留。
+- 引号字面量在行尾即闭合(不跨物理行),从而限制任何畸形/未闭合串的影响范围。
+
 ## 已知边界（写匹配器前已声明的假设）
 
 - CCSID 1388(主机 GBK) Python 无内置 codec，需另配映射；默认 037。

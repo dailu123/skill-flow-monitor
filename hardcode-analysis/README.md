@@ -96,6 +96,21 @@ comment stripping (col-7 `*`, `//`, `*>`, `--`, `/* */`), EBCDIC file decode,
 HSBC kept-when-field-adjacent / dropped otherwise, `GRPMBR_FLAG` not counted as the field,
 and the custom-pattern engine.
 
+## Real-world IBM i source notes
+
+- **SEU seq+date prefix.** Members exported with the sequence number + change date carry a
+  12-char numeric prefix on every record (`000400250811     C ... IF L1GMAB = 'HBCB'`),
+  which shifts the fixed-form columns. The extractor auto-detects this (lines starting with
+  12 digits) and accounts for it so comments strip correctly; force it with
+  `config.SEQ_PREFIX_WIDTH`. Without this, an apostrophe in an unstripped comment
+  (e.g. `Customer's DCN`) would open a runaway string and hide the real values.
+- **Clause-level binding (precision).** Anchor B marks a literal as a GMAB hardcode only
+  when it shares the same `AND`/`OR` clause as a GMAB field — so
+  `IF (L1STUS='1') AND (L1GMAB<>W3GMAB)` and field-to-field comparisons are NOT reported,
+  while `IF L1GMAB='HBCB'`, `MOVE 'HSBC' K7GMAB`, and `%SUBST(L1GMAB:1:2)='HB'` are.
+- Quoted literals are closed at end of line (they do not span physical lines), bounding any
+  malformed/unterminated string.
+
 ## Known boundaries (assumptions stated up front)
 
 - CCSID 1388 (host GBK) has no built-in Python codec; it needs a custom map. Default is 037.
