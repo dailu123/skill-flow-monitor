@@ -6,6 +6,12 @@ Deterministically locate where the 15 group member (GMAB) values are **hardcoded
 IBM i (AS/400) banking codebase, producing a reproducible, structured list for Java-rewrite
 parity verification.
 
+**Two ways to use this:**
+- **Deterministic Python tool** (this README) — repeatable, no-miss, runs offline. The backstop.
+- **Copilot Chat skill** ([`copilot-skill/`](./copilot-skill/)) — a shareable prompt file that
+  teaches Copilot to do the same thing, best-effort, configurable. For people who only have
+  Copilot Chat and want something easy to share.
+
 **Pure Python standard library. Runs on Windows. Recall is guaranteed by rules — no LLM in
 the recall path.** An LLM may optionally (a) classify MEDIUM rows afterwards and (b) author
 new detection patterns (see the skill), but it never reads source line-by-line to "find"
