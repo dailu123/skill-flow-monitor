@@ -115,24 +115,42 @@ def has_field(text, field_re):
     return field_re.search(text) is not None
 
 
-# ---------- clause-level binding (precision: literal must bind to the GMAB field) ----------
-# A literal counts as a GMAB hardcode only when it sits in the SAME comparison/assignment
-# clause as a GMAB field -- not merely the same statement. Splitting on the boolean
-# connectors AND/OR isolates each comparison, so:
-#   IF L1GMAB = 'HBCB'                         -> '1' clause has GMAB  -> bound (HIGH)
-#   MOVE 'HSBC' K7GMAB                          -> one clause has GMAB  -> bound (HIGH)
-#   %SUBST(L1GMAB:1:2) = 'HB'                   -> one clause has GMAB  -> bound (HIGH)
-#   IF (L1STUS='1') AND (L1GMAB<>W3GMAB)        -> '1' clause = (L1STUS='1'), no GMAB -> NOT bound
-#   WHERE GMAB='HBHU' ... AND STATUS='HBSD'     -> 'HBSD' clause has no GMAB -> NOT bound
+# ---------- operator-level binding (precision: literal must bind to the GMAB field) ----------
+# A literal is a GMAB hardcode only when it and a GMAB field are the two operands of the SAME
+# comparison or assignment -- not merely in the same statement/clause. So between the GMAB
+# field token and the literal there may be ONLY "binding glue" (spaces, a relational/assignment
+# operator, %SUBST parens/colons/digits, an X/x hex marker). A '+' (concatenation), another
+# field, a comma or another quote is a barrier. Examples:
+#   IF L1GMAB = 'HBCB'                          -> ' = ' between          -> bound (HIGH)
+#   MOVE 'HSBC' K7GMAB                          -> spaces between         -> bound (HIGH)
+#   %SUBST(L1GMAB:1:2) = 'HB'                   -> ':1:2) = ' between      -> bound (HIGH)
+#   IF (L1STUS='1') AND (L1GMAB<>W3GMAB)        -> '1' clause has no GMAB  -> NOT bound
+#   EVAL s2acno = %trim(s2gmab) + '-' + ...     -> '+' between s2gmab,'-'  -> NOT bound
 _CONNECTOR = re.compile(r"\b(?:AND|OR)\b", re.IGNORECASE)
+_BTOKEN = re.compile(r"[A-Za-z%@#$][A-Za-z0-9%@#$_.]*|<=|>=|<>|[-=<>+*/,();:]|'|\"|\d+")
+# fixed-form traditional comparison/assignment word operators allowed as binding glue
+_RELOP_WORDS = {"EQ", "NE", "NEQ", "LT", "GT", "LE", "GE", "COMP",
+                "IFEQ", "IFNE", "IFGT", "IFLT", "IFGE", "IFLE",
+                "DOWEQ", "DOWNE", "DOUEQ", "WHENEQ", "CABEQ", "ANDEQ", "OREQ"}
 
 
-def clause_bound(code_line, col, field_re):
-    """True if the literal whose opening quote is at 1-based `col` shares its AND/OR clause
-    with a GMAB field token."""
-    if not code_line:
-        return False
-    idx = col - 1
+def _between_ok(between):
+    """True if the text between a GMAB field token and the literal is only binding glue."""
+    between = between.rstrip()
+    if between[-1:] in ("'", '"'):          # the literal's own opening quote (pattern hits
+        between = between[:-1].rstrip()      # report the value column, inside the quotes)
+    if between[-1:] in ("X", "x"):          # hex literal marker just before the quote
+        between = between[:-1]
+    for tok in _BTOKEN.findall(between):
+        if tok in ("=", "<", ">", "<=", ">=", "<>", "(", ")", ":") or tok.isdigit():
+            continue
+        if tok.upper() in _RELOP_WORDS:
+            continue
+        return False                         # '+' '-' '*' '/' ',' quote, or another identifier
+    return True
+
+
+def _clause_span(code_line, idx):
     last = 0
     clauses = []
     for m in _CONNECTOR.finditer(code_line):
@@ -141,8 +159,50 @@ def clause_bound(code_line, col, field_re):
     clauses.append((last, len(code_line)))
     for s, e in clauses:
         if s <= idx < e:
-            return field_re.search(code_line[s:e]) is not None
-    return field_re.search(code_line) is not None   # idx on a boundary: fall back to line
+            return s, e
+    return 0, len(code_line)
+
+
+def _literal_end(s, start):
+    """Index of the closing quote of the literal opening at `start` (handles '' escape).
+    If `start` is not a quote (a pattern hit points inside the literal), return start."""
+    if start >= len(s) or s[start] not in ("'", '"'):
+        return start
+    q = s[start]
+    j = start + 1
+    while j < len(s):
+        if s[j] == q:
+            if j + 1 < len(s) and s[j + 1] == q:
+                j += 2
+                continue
+            return j
+        j += 1
+    return len(s) - 1
+
+
+def clause_bound(code_line, col, field_re):
+    """True if the literal whose opening quote is at 1-based `col` is an operand of a
+    comparison/assignment whose other operand contains a GMAB field token."""
+    if not code_line:
+        return False
+    idx = col - 1
+    if idx >= len(code_line):
+        return False
+    cs, ce = _clause_span(code_line, idx)
+    clause = code_line[cs:ce]
+    lit_start = idx - cs
+    lit_end = _literal_end(clause, lit_start)
+    for m in field_re.finditer(clause):
+        fs, fe = m.start(), m.end()
+        if fe <= lit_start:                  # field before the literal
+            between = clause[fe:lit_start]
+        elif fs >= lit_end:                  # field after the literal
+            between = clause[lit_end + 1:fs]
+        else:
+            continue
+        if _between_ok(between):
+            return True
+    return False
 
 
 # ---------- main entry (per file) ----------

@@ -9,3 +9,4 @@
 000900250811     C                   IF        %SUBST(L1GMAB:1:2) = 'HB'
 001000250811     C                   IF        L1GMAB = X'C8C2C3C2'
 001100250811     C                   IF        L1GMAB = 'HBGD'
+001200250811     C                   EVAL      s2acno = %trim(s2ctcd) + ' ' + %trim(s2gmab) + '-' + %editc(s2acb:'X')
