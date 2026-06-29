@@ -32,7 +32,7 @@ def show_literals(path):
 
 
 def show_hits(path, custom=None):
-    hits, enc = RUN.process_file(path, config.FIELD_NAMES, config.EBCDIC_CODEC, custom)
+    hits, enc, _nlines = RUN.process_file(path, config.FIELD_NAMES, config.EBCDIC_CODEC, custom)
     print("== HITS in {0} ==".format(os.path.basename(path)))
     print("  {0:<4} {1:<4} {2:<10} {3:<6} {4:<2} {5:<6} {6:<6} {7}".format(
         "line", "col", "value", "form", "A/B", "conf", "fadj", "pattern"))

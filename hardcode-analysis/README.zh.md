@@ -57,6 +57,9 @@ python -m hardcode_matcher.run --src <HUB源码根目录> --out gmab_out \
   生成每个值的 EBCDIC 字节以匹配 `X'..'` hex 形式。主机 CCSID 不同则改（如 1388，见已知边界）。
 - `--exts` — 可选扩展名过滤；默认全扫。
 - `--patterns` — 可选自定义模式 JSON；省略则只用锚点 A/B。
+- `--progress-secs` — 进度打印间隔(默认 2.0；`0` 关闭)。进度打到 stderr：先枚举文件，再每隔
+  几秒打 `[百分比] files i/N lines 行数 hits 命中 f/s elapsed ETA | 当前文件`，跑几千万行时
+  能看到在动、卡在哪个文件。
 
 ## 输出列
 

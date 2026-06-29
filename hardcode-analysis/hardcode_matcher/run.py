@@ -15,6 +15,22 @@ No LLM is used for recall. An LLM may optionally classify MEDIUM rows afterwards
 import argparse
 import os
 import sys
+import time
+
+
+def log(msg):
+    """Progress/diagnostics go to stderr (so stdout stays clean for the summary)."""
+    sys.stderr.write(time.strftime("%H:%M:%S ") + msg + "\n")
+    sys.stderr.flush()
+
+
+def _fmt_secs(s):
+    s = int(s)
+    if s < 60:
+        return "{0}s".format(s)
+    if s < 3600:
+        return "{0}m{1:02d}s".format(s // 60, s % 60)
+    return "{0}h{1:02d}m".format(s // 3600, (s % 3600) // 60)
 
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -52,7 +68,7 @@ def process_file(path, field_names, ccsid, custom_patterns=None):
                                  pattern_hits=pat_hits,
                                  bound_fn=bound_fn,
                                  member=member, lang=lang)
-    return hits, enc
+    return hits, enc, len(lines)
 
 
 def main(argv=None):
@@ -69,6 +85,8 @@ def main(argv=None):
                     help="optional JSON file of custom detection patterns")
     ap.add_argument("--exts", default="",
                     help="optional: only scan these extensions (comma-separated, with dot); empty = all")
+    ap.add_argument("--progress-secs", type=float, default=2.0,
+                    help="min seconds between progress lines (0 = off)")
     args = ap.parse_args(argv)
 
     field_names = [f.strip() for f in args.fields.split(",") if f.strip()]
@@ -78,26 +96,56 @@ def main(argv=None):
 
     custom_patterns = patmod.load_patterns(args.patterns) if args.patterns else []
     if custom_patterns:
-        print("loaded {0} custom pattern(s): {1}".format(
+        log("loaded {0} custom pattern(s): {1}".format(
             len(custom_patterns), ", ".join(p.name for p in custom_patterns)))
 
-    all_hits = []
-    n_files = 0
+    # 1) enumerate files first, so we can show counts / percent / ETA
+    log("enumerating files under {0} ...".format(args.src))
+    all_files = []
     for root, _d, files in os.walk(args.src):
         for fn in files:
             if exts is not None and os.path.splitext(fn)[1].lower() not in exts:
                 continue
-            p = os.path.join(root, fn)
-            try:
-                hits, _enc = process_file(p, field_names, args.ccsid, custom_patterns)
-            except Exception as ex:
-                sys.stderr.write("SKIP {0}: {1}\n".format(p, ex))
-                continue
-            n_files += 1
-            all_hits.extend(hits)
+            all_files.append(os.path.join(root, fn))
+    total = len(all_files)
+    log("found {0} files; scanning (fields={1}, ccsid={2})".format(
+        total, ",".join(field_names), args.ccsid))
 
+    # 2) scan with throttled progress
+    all_hits = []
+    n_files = 0
+    n_lines = 0
+    n_skip = 0
+    t0 = time.time()
+    last = t0
+    every = args.progress_secs
+    for p in all_files:
+        try:
+            hits, _enc, nlines = process_file(p, field_names, args.ccsid, custom_patterns)
+        except Exception as ex:
+            n_skip += 1
+            log("SKIP {0}: {1}".format(p, ex))
+            continue
+        n_files += 1
+        n_lines += nlines
+        all_hits.extend(hits)
+        now = time.time()
+        if every > 0 and (now - last >= every or n_files == total):
+            el = now - t0
+            rate = n_files / el if el > 0 else 0
+            eta = (total - n_files) / rate if rate > 0 else 0
+            log("[{0:5.1f}%] files {1}/{2}  lines {3:,}  hits {4}  {5:.0f} f/s  "
+                "elapsed {6}  ETA {7}  | {8}".format(
+                    100.0 * n_files / total if total else 100.0,
+                    n_files, total, n_lines, len(all_hits), rate,
+                    _fmt_secs(el), _fmt_secs(eta), os.path.basename(p)))
+            last = now
+
+    log("writing report ...")
     hits_csv, summary_md = report.write_all(all_hits, args.out)
-    print("files scanned : {0}".format(n_files))
+    log("done in {0}".format(_fmt_secs(time.time() - t0)))
+    print("files scanned : {0} ({1} skipped)".format(n_files, n_skip))
+    print("lines scanned : {0:,}".format(n_lines))
     print("hits           : {0}".format(len(all_hits)))
     print("hits csv       : {0}".format(hits_csv))
     print("summary        : {0}".format(summary_md))

@@ -70,6 +70,9 @@ Argument meaning:
   host CCSID differs (e.g. 1388 — see Known boundaries).
 - `--exts` — optional extension filter; default scans everything.
 - `--patterns` — optional custom-pattern JSON; omit to use only anchors A/B.
+- `--progress-secs` — progress cadence (default 2.0; `0` disables). Progress goes to stderr:
+  it first enumerates files, then prints `[pct] files i/N lines L hits H f/s elapsed ETA | file`
+  every few seconds, so a long run on millions of lines shows it is alive and where it is.
 
 ## Output columns
 
