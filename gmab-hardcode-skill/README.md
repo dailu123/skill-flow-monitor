@@ -4,16 +4,17 @@
 
 A **self-contained, shareable GitHub Copilot Skill**: drop it into a repo and, from Copilot Chat,
 find where **group member / business values are hardcoded** (AS/400 RPG/CL/COBOL or general code).
-It uses only **built-in Windows PowerShell** (no Python, nothing to install) — the skill does the
-whole job end to end.
+By default it uses only **built-in Windows PowerShell** (nothing to install); for raw EBCDIC files
+(or where PowerShell isn't available) it includes a small **optional Python fallback**. The skill
+does the whole job end to end.
 
 > ⚠️ Best-effort assistance — results are **candidates for human review**, not a guarantee.
 
 ## How it works (three steps, defined in SKILL.md)
-1. **Gather all candidates:** the AI runs **one fixed PowerShell command** that deterministically
-   walks the source, skips comments (any prefix width), and exports every line with a group-member
-   field + a quoted literal (incl. `X'..'` hex) to `candidates.csv`. **Everyone has PowerShell, and
-   it scales to tens of millions of lines.**
+1. **Gather all candidates:** the AI runs **one fixed PowerShell command** (no install) that
+   deterministically walks the source, skips comments (any prefix width), and exports every line
+   with a group-member field + a quoted literal (incl. `X'..'` hex) to `candidates.csv`. Scales to
+   tens of millions of lines. (Raw EBCDIC files → use the bundled Python fallback.)
 2. **Judge each candidate:** the AI reads `candidates.csv` and rules each one YES/NO + reason +
    confidence (compare/assign/const bind → yes; field-to-field, concat separators, a different
    field's value in a compound test, comments → no).

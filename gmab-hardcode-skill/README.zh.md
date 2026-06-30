@@ -3,15 +3,16 @@
 > English: [README.md](./README.md)
 
 一个**自洽、可分享的 GitHub Copilot Skill**:放进仓库,在 Copilot Chat 里一句话就能扫出代码里
-**写死的 group member / 业务值**(AS/400 RPG/CL/COBOL 或一般代码)。**只用 Windows 自带的
-PowerShell,不装任何东西**(不用 Python),skill 本身从头到尾把活干完。
+**写死的 group member / 业务值**(AS/400 RPG/CL/COBOL 或一般代码)。**默认只用 Windows 自带的
+PowerShell,零安装**;遇到原始 EBCDIC 文件或没 PowerShell 时,skill 里附了一段**可选的小 Python**
+兜底(能解 937)。skill 本身从头到尾把活干完。
 
 > ⚠️ 尽力而为的辅助,结果是**给人复核的候选**,不保证 100%。
 
 ## 怎么干活(三步,写在 SKILL.md 里)
-1. **捞全候选**:skill 让 AI 跑**一条固定的 PowerShell 命令**——确定性地遍历源码、跳过注释(前缀
-   无关)、把"含 group member 字段 + 引号字面量"的行(含 `X'..'` 十六进制)全导出到
-   `candidates.csv`。**Windows 人人都有 PowerShell,能扛几千万行**,先不判断、宁多勿漏。
+1. **捞全候选**:skill 让 AI 跑**一条固定的 PowerShell 命令**(零安装)——确定性地遍历源码、跳过
+   注释(前缀无关)、把"含 group member 字段 + 引号字面量"的行(含 `X'..'` 十六进制)全导出到
+   `candidates.csv`。**能扛几千万行**,先不判断、宁多勿漏。(原始 EBCDIC 文件 → 用附带的 Python 兜底。)
 2. **逐个判断**:AI 读 `candidates.csv`,对每一行判 **是/否 hardcode + 理由 + 置信度**(按内置规则:
    比较/赋值/const 绑定算;字段间、拼接分隔符、复合条件里别的字段的值、注释 不算)。
 3. **出完整 list**:确认命中的表格 + 汇总。

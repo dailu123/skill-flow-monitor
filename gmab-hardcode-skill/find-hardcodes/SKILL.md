@@ -3,9 +3,9 @@ name: find-hardcodes
 description: >
   Find hardcoded group-member / business codes in source (legacy AS/400 RPG/CL/COBOL/DDS or
   general code). Use when asked to locate where a value is written directly into the logic.
-  Three steps: (1) run a fixed PowerShell command to gather all candidate lines (scales to
-  millions of lines, no extra tools); (2) judge each candidate; (3) output the final list.
-  Configurable via the CONFIG block.
+  Three steps: (1) run a fixed PowerShell command (default, no install) — or a small Python
+  fallback for raw EBCDIC — to gather all candidate lines; (2) judge each candidate; (3) output
+  the final list. Configurable via the CONFIG block.
 ---
 
 # Find hardcoded values
@@ -73,9 +73,56 @@ STEP 2. Report how many candidates were found.
   `$Field = "'(HAAA|HBBJ|HBCB|HSBC)'"` (the values, quoted). For the EBCDIC hex form add e.g.
   `|X'C8C2C3C2'` (HBCB). `Select-String` is case-insensitive by default.
 
-> Notes: works on text source (as it appears in the editor). If a file is raw EBCDIC, convert it
-> to text first — the hex form `X'..'` is plain ASCII and is still found. On millions of lines the
-> command may take a few minutes; that is normal.
+> PowerShell reads files as text (UTF-8 / ANSI). It works on source that shows correctly in the
+> editor (i.e. already text), and `X'..'` hex is plain ASCII so it is found regardless. On
+> millions of lines it may take a few minutes — that is normal.
+
+**Fallback (only if needed): a tiny Python script.** Use this **only** when PowerShell can't read
+the files (some members are raw **EBCDIC** binary) or PowerShell isn't available. It is the same
+logic but decodes EBCDIC (CCSID 937 letters == cp037). Save as `gather.py`, run
+`python gather.py "<SOURCE>" candidates.csv`:
+
+```python
+import os, re, csv, sys
+SRC = sys.argv[1] if len(sys.argv) > 1 else "."
+OUT = sys.argv[2] if len(sys.argv) > 2 else "candidates.csv"
+FIELD   = re.compile(r'(?i)(?<![A-Za-z0-9_@#$])(?:[A-Za-z0-9_@#$]{2})?GMAB(?![A-Za-z0-9_@#$])')
+COMMENT = re.compile(r'(?i)^[0-9 ]*[HFDICOPJ][*/]')
+CLEAN   = dict.fromkeys([c for c in range(0x20) if c != 0x09] + [0x7f], None)
+
+def decode(p):
+    d = open(p, "rb").read()
+    try:
+        return d.decode("utf-8")
+    except UnicodeDecodeError:
+        codec = "cp037" if d.count(0x40) > d.count(0x20) else "latin-1"   # EBCDIC vs latin-1
+        return d.decode(codec, "replace")
+
+rows = []
+for root, _dirs, files in os.walk(SRC):
+    for fn in files:
+        p = os.path.join(root, fn)
+        try:
+            text = decode(p)
+        except Exception:
+            continue
+        if "\x00" in text:
+            continue
+        for i, line in enumerate(text.split("\n"), 1):
+            if COMMENT.match(line):
+                continue
+            if FIELD.search(line) and "'" in line:
+                rows.append([os.path.relpath(p, SRC), i, line.strip().translate(CLEAN)[:300]])
+
+with open(OUT, "w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["file", "line", "code"])
+    w.writerows(rows)
+print("candidates:", len(rows), "->", OUT)
+```
+
+Edit `FIELD` the same way as `$Field` above to change the field/value. Use whichever of the two
+you like — they produce the same candidate set.
 
 ---
 
