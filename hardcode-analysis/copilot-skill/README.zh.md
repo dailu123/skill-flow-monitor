@@ -2,26 +2,36 @@
 
 > English: [README.md](./README.md)
 
-这是一个 **Copilot Chat 的 skill**(prompt file)。把一个 Markdown 文件放进仓库,就能在
+这是一个 **GitHub Copilot Skill**(`.github/skills/` 文件夹格式)。把一个文件夹放进仓库,就能在
 Copilot Chat 里用一句话扫出代码里**写死的业务值/代码**(branch/status/group member 等)。
 **什么都不改也能用**(尽量多地找);也可以改顶部配置做定制。
 
 > ⚠️ 这是**尽力而为的辅助**,结果是给人复核的候选,不保证 100%。要"可复现、保证不漏"的全量扫描,
 > 用随附的确定性 Python 工具(见上级目录 `hardcode-analysis/`)。本 skill 是好分享的轻量版。
 
+## 它怎么干活(三步)
+1. **先把候选捞全**(机械搜索,任何编码):凡是 group member 字段被赋值/比较、或用户给的目标值
+   出现的地方(含 `X'..'` 十六进制)——全列出来,先不判断。
+2. **AI 逐个判断**每一处是不是 hardcode,给结论 + 理由(按内置规则)。
+3. **给出完整 list**(确认的命中表 + 汇总)。
+
 ---
 
 ## 一、怎么用(两种,任选)
 
-**方式 A:作为 prompt file(推荐,可重复用 `/` 调用)**
-1. 把 [`find-hardcodes.prompt.md`](./find-hardcodes.prompt.md) 复制到你仓库的 `.github/prompts/` 目录。
-2. VS Code 设置里打开 `chat.promptFiles`(设为 true)。
-3. 在 Copilot Chat 输入框打 `/find-hardcodes`,回车;可再补一句范围,如"扫 sources/CHN_HUB_IB"。
+**方式 A:作为 Skill(推荐,可重复用 `/` 调用)**
+1. 把整个 [`find-hardcodes/`](./find-hardcodes/) 文件夹复制到你仓库的 **`.github/skills/`** 下
+   (即 `.github/skills/find-hardcodes/SKILL.md`)。
+2. 在 Copilot Chat(Agent 模式)里打 `/find-hardcodes`,回车;可再补一句范围,如"扫 sources/CHN_HUB_IB"。
+   Agent 启动时会自动发现并加载这个 skill。
 
 **方式 B:最省事(不用任何配置)**
 1. 打开 Copilot Chat。
-2. 把 `find-hardcodes.prompt.md` 的**全部内容粘贴**进去。
-3. 末尾加一句:"按上面规则扫 `<你的文件夹>`,输出表格。"
+2. 把 `find-hardcodes/SKILL.md` 的**全部内容粘贴**进去。
+3. 末尾加一句:"按上面三步扫 `<你的文件夹>`,输出表格。"
+
+> **要不要 `copilot-instructions.md`?不需要。** 那个文件是**每次对话都自动注入**的全局指令,
+> 不适合"找硬编码"这种按需任务。Skill 是按需 `/` 调用,正好。
 
 ---
 
@@ -66,5 +76,6 @@ EXTRA_EXCLUDE =
 
 ## 四、给别人讲的一句话
 
-> "把这个 `.prompt.md` 放进 `.github/prompts/`,在 Copilot Chat 打 `/find-hardcodes` 就能扫硬编码;
-> 改最上面的配置块能指定扫哪些、不扫哪些、找什么值、加排除规则。结果要人复核。"
+> "把 `find-hardcodes/` 文件夹放进 `.github/skills/`,在 Copilot Chat 打 `/find-hardcodes` 就能扫硬编码:
+> **先把候选捞全 → AI 逐个判断 → 出完整 list**;改 SKILL.md 最上面的配置块能指定扫哪些、不扫哪些、
+> 找什么值、加排除规则。结果要人复核。"

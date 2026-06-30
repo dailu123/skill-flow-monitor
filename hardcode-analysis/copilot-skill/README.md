@@ -2,29 +2,40 @@
 
 > 中文：[README.zh.md](./README.zh.md)
 
-This is a **Copilot Chat skill** (a prompt file). Drop one Markdown file into a repo and you
-can ask Copilot Chat to find **hardcoded business values / codes** (branch/status/group member,
-etc.) in the code. It **works out of the box** (finds as much as possible) and is customisable
-via a config block at the top.
+This is a **GitHub Copilot Skill** (a `.github/skills/` folder). Drop the folder into a repo and
+you can ask Copilot Chat to find **hardcoded business values / codes** (branch/status/group
+member, etc.). It **works out of the box** (finds as much as possible) and is customisable via a
+config block at the top of `SKILL.md`.
 
 > ⚠️ This is **best-effort assistance** — results are candidates for human review, not a
 > guarantee. For a *repeatable, no-miss* full scan, use the deterministic Python tool that
 > ships alongside it (parent folder `hardcode-analysis/`). This skill is the easy, shareable
 > version.
 
+## How it works (three steps)
+1. **Gather all candidates** (mechanical search, any encoding): every place a group member
+   field is assigned/compared, or a target value appears (incl. `X'..'` hex) — list them, no
+   judging yet.
+2. **Judge each candidate** one by one — is it a hardcode? verdict + reason (built-in rules).
+3. **Final list** (confirmed hits table + summary).
+
 ---
 
 ## 1. How to use (pick one)
 
-**Option A — as a prompt file (recommended, reusable via `/`)**
-1. Copy [`find-hardcodes.prompt.md`](./find-hardcodes.prompt.md) into your repo's `.github/prompts/`.
-2. Enable the VS Code setting `chat.promptFiles` (set to true).
-3. In Copilot Chat type `/find-hardcodes`, Enter; optionally add a scope, e.g. "scan sources/CHN_HUB_IB".
+**Option A — as a Skill (recommended, reusable via `/`)**
+1. Copy the whole [`find-hardcodes/`](./find-hardcodes/) folder into your repo's **`.github/skills/`**
+   (i.e. `.github/skills/find-hardcodes/SKILL.md`).
+2. In Copilot Chat (Agent mode) type `/find-hardcodes`, Enter; optionally add a scope, e.g.
+   "scan sources/CHN_HUB_IB". The agent discovers the skill automatically on start.
 
 **Option B — simplest, no setup**
 1. Open Copilot Chat.
-2. Paste the **entire content** of `find-hardcodes.prompt.md`.
-3. Add a line: "Apply the rules above to `<your folder>` and output the table."
+2. Paste the **entire content** of `find-hardcodes/SKILL.md`.
+3. Add a line: "Apply the three steps above to `<your folder>` and output the table."
+
+> **Do you need `copilot-instructions.md`? No.** That file is injected into *every* chat
+> automatically — wrong for an on-demand task. A Skill is invoked on demand with `/`, which fits.
 
 ---
 
@@ -71,6 +82,7 @@ and the single matched line.
 
 ## 4. One-liner to pass on
 
-> "Drop this `.prompt.md` into `.github/prompts/`, type `/find-hardcodes` in Copilot Chat to
-> scan for hardcodes; edit the config block at the top to choose what to scan, what to skip,
-> which values to find, and add exclusions. Always review the results."
+> "Drop the `find-hardcodes/` folder into `.github/skills/`, type `/find-hardcodes` in Copilot
+> Chat: it **gathers all candidates → judges each one → outputs the final list**; edit the
+> config block at the top of SKILL.md to choose what to scan, what to skip, which values to
+> find, and add exclusions. Always review the results."

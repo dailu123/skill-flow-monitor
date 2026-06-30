@@ -7,8 +7,9 @@
 
 **两种用法:**
 - **确定性 Python 工具**(本文档)——可复现、不漏、离线跑。兜底基线。
-- **Copilot Chat skill**([`copilot-skill/`](./copilot-skill/))——一个可分享的 prompt file,
-  教 Copilot 做同样的事,尽力而为、可配置。适合只有 Copilot Chat、想方便分享给别人的场景。
+- **Copilot Chat skill**([`copilot-skill/`](./copilot-skill/))——一个可分享的 `.github/skills/`
+  文件夹(SKILL.md),教 Copilot 做同样的事(捞全→逐个判断→出 list),尽力而为、可配置。
+  适合只有 Copilot Chat、想方便分享给别人的场景。
 
 **纯 Python 标准库，Windows 可跑，召回全靠规则——召回路径里不调用 LLM。** LLM 仅可作可选步骤：
 (a) 事后对 MEDIUM 条目分类；(b) 编写新的检测模式(见 skill)。它绝不逐行阅读源码去"找"硬编码。
