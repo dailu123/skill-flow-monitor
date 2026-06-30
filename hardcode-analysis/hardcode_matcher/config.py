@@ -26,9 +26,12 @@ HSBC_VALUE = "HSBC"
 # Case-insensitive, matched on token boundaries (so xxGMAB_FLAG is NOT a false hit).
 # Wildcards are supported for variable-prefix names:
 #   '?' = exactly one identifier char,  '*' = zero or more.
-# In HUB the group member column is named "<2 variable chars>GMAB", so use "??GMAB".
+# In HUB the group member column is usually "<2 variable chars>GMAB" (L1GMAB, K7GMAB, ...),
+# but it is sometimes written bare as "GMAB". List BOTH so neither is missed. Token
+# boundaries still exclude GMAB_FLAG and 3+-char prefixes like ABCGMAB.
 FIELD_NAMES = [
-    "??GMAB",   # 2 variable prefix chars + GMAB; add aliases here if SYSCOLUMNS shows any
+    "GMAB",     # bare field name
+    "??GMAB",   # 2 variable prefix chars + GMAB; add more aliases here per SYSCOLUMNS
 ]
 
 # === EBCDIC CCSID: Python codec name used (a) to decode raw EBCDIC files and (b) to build

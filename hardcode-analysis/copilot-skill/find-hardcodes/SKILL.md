@@ -25,7 +25,8 @@ honestly). Never invent a hit; every candidate must cite a real `file:line` you 
 TARGET_VALUES   = ANY            # ANY = any hardcoded code/flag/magic literal.
                                  # Or a fixed list, e.g.: HAAA,HBBJ,HBCB,HSBC
 VALUE_SHAPE     = ANY            # Optional hint, e.g. "4 letters starting with H", or a regex.
-FIELD_PATTERNS  = ??GMAB         # The group member field name(s). ? = one char, * = many.
+FIELD_PATTERNS  = GMAB,??GMAB    # The group member field name(s). ? = one char, * = many.
+                                 # Bare GMAB AND the usual 2-char-prefix form (L1GMAB, ...).
                                  # Comma-separated. ANY = a value bound to any field counts.
 
 # SCOPE — what to scan

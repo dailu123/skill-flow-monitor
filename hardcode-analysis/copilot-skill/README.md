@@ -47,7 +47,7 @@ Leave a field blank or `ANY` to keep the broad default. Common edits:
 |------|-------|---------|
 | Only a fixed set of values | `TARGET_VALUES` | `TARGET_VALUES = HAAA,HBBJ,HBCB,HSBC` |
 | Hint the value shape | `VALUE_SHAPE` | `VALUE_SHAPE = 4 letters starting with H` |
-| Which field the value binds to (prefix match) | `FIELD_PATTERNS` | `FIELD_PATTERNS = ??GMAB` (`?`=one char, `*`=many) |
+| Which field the value binds to (prefix match) | `FIELD_PATTERNS` | `FIELD_PATTERNS = GMAB,??GMAB` (bare + 2-char prefix; `?`=one char, `*`=many) |
 | Only scan some paths | `INCLUDE_GLOBS` | `INCLUDE_GLOBS = sources/**, src/**` |
 | Skip some paths | `EXCLUDE_GLOBS` | `EXCLUDE_GLOBS = **/test/**, **/generated/**` |
 | Skip some extensions | `EXCLUDE_EXTS` | `EXCLUDE_EXTS = .md,.json,.log,.txt` |

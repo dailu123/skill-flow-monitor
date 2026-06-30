@@ -13,8 +13,8 @@ reading the code, so the same source always produces the same list.
 HAAA  HBBJ  HBCB  HBCD  HBCF  HBCQ  HBDP  HBFU  HBGD  HBHT  HBHU  HBMC  HBSD  HBSH  HSBC
 ```
 
-The group member field in HUB is named `??GMAB` (two variable characters + `GMAB`,
-e.g. `L1GMAB`, `K7GMAB`).
+The group member field in HUB is usually named `??GMAB` (two variable characters + `GMAB`,
+e.g. `L1GMAB`, `K7GMAB`), and is sometimes written bare as `GMAB`. Both are matched.
 
 ---
 

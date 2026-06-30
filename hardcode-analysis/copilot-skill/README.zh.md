@@ -43,7 +43,7 @@ Copilot Chat 里用一句话扫出代码里**写死的业务值/代码**(branch/
 |---|---|---|
 | 只找某几个固定值 | `TARGET_VALUES` | `TARGET_VALUES = HAAA,HBBJ,HBCB,HSBC` |
 | 值的形状提示 | `VALUE_SHAPE` | `VALUE_SHAPE = 4 个字母、以 H 开头` |
-| 值贴在哪个字段(前缀匹配) | `FIELD_PATTERNS` | `FIELD_PATTERNS = ??GMAB`(`?`=任一字符,`*`=多个) |
+| 值贴在哪个字段(前缀匹配) | `FIELD_PATTERNS` | `FIELD_PATTERNS = GMAB,??GMAB`(裸 GMAB + 2 位前缀;`?`=任一字符,`*`=多个) |
 | 只扫某些路径 | `INCLUDE_GLOBS` | `INCLUDE_GLOBS = sources/**, src/**` |
 | 不扫某些路径 | `EXCLUDE_GLOBS` | `EXCLUDE_GLOBS = **/test/**, **/generated/**` |
 | 不扫某些后缀 | `EXCLUDE_EXTS` | `EXCLUDE_EXTS = .md,.json,.log,.txt` |

@@ -12,7 +12,8 @@
 HAAA  HBBJ  HBCB  HBCD  HBCF  HBCQ  HBDP  HBFU  HBGD  HBHT  HBHU  HBMC  HBSD  HBSH  HSBC
 ```
 
-HUB 里 group member 字段名为 `??GMAB`(2 位可变字符 + `GMAB`,如 `L1GMAB`、`K7GMAB`)。
+HUB 里 group member 字段名**一般**为 `??GMAB`(2 位可变字符 + `GMAB`,如 `L1GMAB`、`K7GMAB`),
+**有时也直接裸写 `GMAB`**。两者都匹配。
 
 ---
 

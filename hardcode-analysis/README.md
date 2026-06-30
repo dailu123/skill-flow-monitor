@@ -57,7 +57,7 @@ not reproducible, risks missing lines, and its cost scales with code size. Recal
 
 ```
 python -m hardcode_matcher.run --src <HUB source root> --out gmab_out \
-    --fields "??GMAB" --ccsid cp037 \
+    --fields "GMAB,??GMAB" --ccsid cp037 \
     --patterns patterns/custom_patterns.example.json
 ```
 
@@ -69,8 +69,8 @@ Argument meaning:
 - `--out` — output directory for `gmab_hits.csv` + `gmab_summary.md`.
 - `--fields` — the group member **column name(s)**, comma-separated, used for anchor B
   (field adjacency). Supports wildcards: `?` = one identifier char, `*` = many. In HUB the
-  column has a **2-char variable prefix**, so use `"??GMAB"` (matches `01GMAB`, `bkGMAB`,
-  …, but not bare `GMAB`, a 3-char prefix, or `xxGMAB_FLAG`).
+  column is usually `??GMAB` (2-char variable prefix: `01GMAB`, `bkGMAB`, …) and sometimes
+  bare `GMAB`, so the default is `"GMAB,??GMAB"` — both, but not a 3-char prefix or `xxGMAB_FLAG`.
 - `--ccsid` — EBCDIC codec (default `cp037` = CCSID 037). Used both to decode raw EBCDIC
   source and to compute each value's EBCDIC bytes for the `X'..'` hex form. Change it if the
   host CCSID differs (e.g. 1388 — see Known boundaries).

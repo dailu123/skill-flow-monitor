@@ -47,7 +47,7 @@
 
 ```
 python -m hardcode_matcher.run --src <HUB源码根目录> --out gmab_out \
-    --fields "??GMAB" --ccsid cp037 \
+    --fields "GMAB,??GMAB" --ccsid cp037 \
     --patterns patterns/custom_patterns.example.json
 ```
 
@@ -57,8 +57,8 @@ python -m hardcode_matcher.run --src <HUB源码根目录> --out gmab_out \
   工具或其它语言文件，否则会扫出无关字面量）。
 - `--out` — 输出目录，生成 `gmab_hits.csv` + `gmab_summary.md`。
 - `--fields` — group member **列名**（逗号分隔），用于锚点 B（贴字段判定）。支持通配符：
-  `?`=一个标识符字符，`*`=多个。HUB 里该列有**两位可变前缀**，故用 `"??GMAB"`（能匹配
-  `01GMAB`、`bkGMAB` 等，但不匹配裸 `GMAB`、三位前缀、或 `xxGMAB_FLAG`）。
+  `?`=一个标识符字符，`*`=多个。HUB 里该列**一般两位可变前缀、有时裸写 GMAB**，故默认 `"GMAB,??GMAB"`（能匹配
+  裸 `GMAB`、`01GMAB`、`bkGMAB` 等，但不匹配三位前缀 `ABCGMAB` 或 `xxGMAB_FLAG`）。
 - `--ccsid` — EBCDIC codec（默认 `cp037`=CCSID 037）。两个用途：解码原始 EBCDIC 源码、
   生成每个值的 EBCDIC 字节以匹配 `X'..'` hex 形式。主机 CCSID 不同则改（如 1388，见已知边界）。
 - `--exts` — 可选扩展名过滤；默认全扫。
