@@ -3,9 +3,9 @@ name: find-hardcodes
 description: >
   Find hardcoded group-member / business codes in source (legacy AS/400 RPG/CL/COBOL/DDS or
   general code). Use when asked to locate where a value is written directly into the logic.
-  Three steps: (1) run a fixed PowerShell command (default, no install) — or a small Python
-  fallback for raw EBCDIC — to gather all candidate lines; (2) judge each candidate; (3) output
-  the final list. Configurable via the CONFIG block.
+  Three steps: (1) generate and run a small search script (your choice of PowerShell, default,
+  or Python for raw EBCDIC) that follows the precise spec below to gather all candidate lines;
+  (2) judge each candidate; (3) output the final list. Configurable via the CONFIG block.
 ---
 
 # Find hardcoded values
@@ -15,7 +15,7 @@ into the logic, so it can be checked against a rewrite. This is **best-effort as
 results are candidates for human review, not a guarantee.
 
 The job is split so it scales and stays honest:
-1. **Gather** every candidate with one deterministic PowerShell command (recall — miss nothing).
+1. **Gather** every candidate with a small script you generate (recall — miss nothing).
 2. **Judge** each candidate one by one (precision — is it really a hardcode?).
 3. **List** the confirmed results.
 
@@ -36,93 +36,56 @@ EXTRA_EXCLUDE   =                # free-text rules, one per line, obeyed in STEP
 
 ---
 
-## STEP 1 — Gather all candidates with PowerShell. Do NOT judge yet.
+## STEP 1 — Generate and run a gather script. Do NOT judge yet.
 
-Everyone on Windows has PowerShell — no Python or extra install. Run this **fixed** pipeline
-(set `$Src`; edit `$Field`/filters only if the CONFIG differs). It walks the source, keeps lines
-that contain a group-member field **and** a quoted literal, drops comment lines (any sequence-
-number prefix width), and writes `candidates.csv`. It over-collects on purpose.
+**Write the script yourself** — do not expect one to be provided. Prefer **Windows PowerShell**
+(no install, everyone has it). Use **Python** only if some files are raw **EBCDIC** binary
+(PowerShell can't decode those) or PowerShell isn't available. The script must produce a CSV
+called `candidates.csv` and must implement **exactly** the rules below. (A human may edit any
+rule here to change behaviour.)
 
-```powershell
-# ---- set these from CONFIG ----
-$Src     = "C:\path\to\source"          # SOURCE ROOT to scan
-$Out     = "candidates.csv"
-# FIELD_PATTERNS = GMAB,??GMAB  -> bare GMAB or a 2-char prefix; '_' counts as an identifier char
-$Field   = '(?<![A-Za-z0-9_@#$])(?:[A-Za-z0-9_@#$]{2})?GMAB(?![A-Za-z0-9_@#$])'
-$Comment = '^[0-9 ]*[HFDICOPJ][*/]'     # fixed-form comment line, any prefix width
+**A. Which files to scan (from CONFIG)**
+- Walk the source root recursively.
+- Keep only paths matching `INCLUDE_GLOBS`; drop any matching `EXCLUDE_GLOBS`.
+- Drop files whose extension is in `EXCLUDE_EXTS`.
+- If `NAME_STARTS_WITH` is set, keep a file only if its name — or one of its parent folder names —
+  starts with one of the listed prefixes.
+- Skip binary files (any file containing a NUL byte).
 
-Get-ChildItem -Path $Src -Recurse -File |
-  # ---- optional scope filters (uncomment / edit to match CONFIG) ----
-  # Where-Object { $_.Name -like 'IB*' -or $_.Directory.Name -like 'IB*' } |   # NAME_STARTS_WITH
-  # Where-Object { $_.Extension -notin '.md','.json','.log' } |                # EXCLUDE_EXTS
-  Select-String -Pattern $Field |
-  Where-Object { $_.Line.Contains("'") -and $_.Line -notmatch $Comment } |
-  Select-Object @{n='file';e={$_.Path}}, LineNumber, @{n='code';e={$_.Line.Trim()}} |
-  Export-Csv -NoTypeInformation -Encoding UTF8 $Out
+**B. Reading / encoding**
+- Read each file as text. If it is not valid UTF-8 and looks like EBCDIC (the byte 0x40 — the
+  EBCDIC space — dominates), decode it as code page **037 / cp037**. The target codes are
+  uppercase letters, which are identical across EBCDIC code pages, so this is safe even for a
+  CCSID-937 host.
 
-Write-Host ("candidates -> {0}  (rows: {1})" -f $Out, (Import-Csv $Out).Count)
-```
+**C. Emit a line as a candidate when ALL of these are true** (over-collect — recall first):
+1. **It is not a comment.** A comment line = an optional leading run of digits and spaces (the
+   SEU sequence-number / date / change-id prefix — *any* width), then an RPG form-type letter
+   (`H` `F` `D` `I` `C` `O` `P` `J`) immediately followed by `*` or `/`. Examples of comments to
+   skip: `10491H* ...`, `54900000000017453C* ...`, `     D* ...`. Also drop free-form `//`,
+   COBOL `*>`, and SQL `--` (ignore everything from that marker to end of line).
+2. **It references the group-member field.** Match a **whole-word** token that is either bare
+   `GMAB`, **or** exactly **two** identifier characters followed by `GMAB`. Identifier characters
+   are `A–Z a–z 0–9 _ @ # $`. "Whole-word" means the characters immediately before and after the
+   token are **not** identifier characters. So these MATCH: `GMAB`, `L1GMAB`, `K7GMAB`, `W0gmab`
+   (case-insensitive); these do NOT: `GMAB_FLAG` (trailing `_`), `ABCGMAB` (3-char prefix),
+   `chkGmab` (preceded by a letter). Matching is case-insensitive.
+   - If `FIELD_PATTERNS` differs, follow it instead: `?` = one identifier char, `*` = any number,
+     comma = OR. If `FIELD_PATTERNS = ANY`, drop this requirement (match any field).
+3. **It contains a quoted string literal** — a single quote `'` appears on the line. This also
+   covers hex literals such as `X'C8C2C3C2'`.
 
-Then open `candidates.csv` (columns `file,LineNumber,code`) — that is your candidate set for
-STEP 2. Report how many candidates were found.
+**D. Also (only if `TARGET_VALUES` is a list, in addition to C):** emit any line containing one of
+those values inside quotes (e.g. `'HBCB'`), and any line containing the value's **EBCDIC hex**
+inside `X'...'`. Build the hex by mapping each letter to its EBCDIC byte:
+`H=C8 A=C1 B=C2 C=C3 D=C4 F=C6 G=C7 J=D1 M=D4 P=D7 Q=D8 S=E2 T=E3 U=E4` (digits `0–9` = `F0–F9`).
+So `HBCB` → `X'C8C2C3C2'`.
 
-**Adjusting `$Field` from CONFIG (only if you change FIELD_PATTERNS):**
-- Different field name `FOO` with the same bare/2-prefix rule: replace `GMAB` with `FOO`.
-- An explicit list of exact names: `'(?<![A-Za-z0-9_@#$])(NAME1|NAME2)(?![A-Za-z0-9_@#$])'`.
-- **Search by value instead** (TARGET_VALUES set, FIELD_PATTERNS = ANY): use
-  `$Field = "'(HAAA|HBBJ|HBCB|HSBC)'"` (the values, quoted). For the EBCDIC hex form add e.g.
-  `|X'C8C2C3C2'` (HBCB). `Select-String` is case-insensitive by default.
+**E. Output** `candidates.csv` with columns `file,line,code`, where `code` is the matched line,
+trimmed, with control characters removed. Print how many candidate lines were found. On millions
+of lines this may take a few minutes — that is fine.
 
-> PowerShell reads files as text (UTF-8 / ANSI). It works on source that shows correctly in the
-> editor (i.e. already text), and `X'..'` hex is plain ASCII so it is found regardless. On
-> millions of lines it may take a few minutes — that is normal.
-
-**Fallback (only if needed): a tiny Python script.** Use this **only** when PowerShell can't read
-the files (some members are raw **EBCDIC** binary) or PowerShell isn't available. It is the same
-logic but decodes EBCDIC (CCSID 937 letters == cp037). Save as `gather.py`, run
-`python gather.py "<SOURCE>" candidates.csv`:
-
-```python
-import os, re, csv, sys
-SRC = sys.argv[1] if len(sys.argv) > 1 else "."
-OUT = sys.argv[2] if len(sys.argv) > 2 else "candidates.csv"
-FIELD   = re.compile(r'(?i)(?<![A-Za-z0-9_@#$])(?:[A-Za-z0-9_@#$]{2})?GMAB(?![A-Za-z0-9_@#$])')
-COMMENT = re.compile(r'(?i)^[0-9 ]*[HFDICOPJ][*/]')
-CLEAN   = dict.fromkeys([c for c in range(0x20) if c != 0x09] + [0x7f], None)
-
-def decode(p):
-    d = open(p, "rb").read()
-    try:
-        return d.decode("utf-8")
-    except UnicodeDecodeError:
-        codec = "cp037" if d.count(0x40) > d.count(0x20) else "latin-1"   # EBCDIC vs latin-1
-        return d.decode(codec, "replace")
-
-rows = []
-for root, _dirs, files in os.walk(SRC):
-    for fn in files:
-        p = os.path.join(root, fn)
-        try:
-            text = decode(p)
-        except Exception:
-            continue
-        if "\x00" in text:
-            continue
-        for i, line in enumerate(text.split("\n"), 1):
-            if COMMENT.match(line):
-                continue
-            if FIELD.search(line) and "'" in line:
-                rows.append([os.path.relpath(p, SRC), i, line.strip().translate(CLEAN)[:300]])
-
-with open(OUT, "w", newline="", encoding="utf-8") as f:
-    w = csv.writer(f)
-    w.writerow(["file", "line", "code"])
-    w.writerows(rows)
-print("candidates:", len(rows), "->", OUT)
-```
-
-Edit `FIELD` the same way as `$Field` above to change the field/value. Use whichever of the two
-you like — they produce the same candidate set.
+Open `candidates.csv` — that is your candidate set for STEP 2. Report the count.
 
 ---
 
@@ -174,5 +137,5 @@ HIGH/MEDIUM/LOW counts, and anything skipped.
 ---
 
 ### Note on accuracy
-Every result is a candidate for human review. Spot-check HIGH, review MEDIUM/LOW. The PowerShell
-step is deterministic (same input → same candidates); the judging step is the AI's best effort.
+Every result is a candidate for human review. Spot-check HIGH, review MEDIUM/LOW. The gather step
+is deterministic (same input → same candidates); the judging step is the AI's best effort.
