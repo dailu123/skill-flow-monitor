@@ -15,7 +15,8 @@ into the logic, so it can be checked against a rewrite. This is **best-effort as
 results are candidates for human review, not a guarantee.
 
 The job is split so it scales and stays honest:
-1. **Gather** every candidate with a small script you generate (recall — miss nothing).
+1. **Gather** candidates with a small script you generate (recall-first — over-collect; see the
+   recall note in STEP 1 for what maximises coverage and what it still can't catch).
 2. **Judge** each candidate one by one (precision — is it really a hardcode?).
 3. **List** the confirmed results.
 
@@ -86,6 +87,17 @@ trimmed, with control characters removed. Print how many candidate lines were fo
 of lines this may take a few minutes — that is fine.
 
 Open `candidates.csv` — that is your candidate set for STEP 2. Report the count.
+
+**Recall note (be honest about coverage).** The gather is *deterministic* (same input → same
+output) but not *exhaustive*. The rules above catch a hardcode only when a field **and** a quote
+are on the **same line**. To maximise recall:
+- If `TARGET_VALUES` is a **known, closed set**, LIST it (do not leave it `ANY`). Then rule **D**
+  also searches for the exact values + their EBCDIC hex **anywhere**, catching cases where the
+  value and the field are on different lines (reached via a work field, parameter, array, etc.).
+- Known blind spots that even this won't catch — flag them for human/sample review:
+  multi-line / continued statements (`IF GMAB =` then `'HBCB'` on the next line); the value built
+  up by concatenation; a value stored only in data (DTAARA / DDS default), not in code; or a value
+  written in an encoding other than text or `X'..'` hex. No pure scan guarantees 100%.
 
 ---
 
